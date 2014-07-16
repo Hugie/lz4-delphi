@@ -35,16 +35,16 @@ See Licence files:
 Speed and Validation Test
 ==========
 
-   System: Intel Core i7 M640 Dual Core, 2.80GHz, 8GB RAM
-   Input: 270MB Dicom Medical Image File
+    System: Intel Core i7 M640 Dual Core, 2.80GHz, 8GB RAM
+    Input: 270MB Dicom Medical Image File
 
-   LZ4 ( pure lz4 )
-   LZ4SS  ( lz4s via TMemoryStream )
-   LZ4SSN ( lz4s via TMemoryStream - no Hash Stream Checks )
-   LZ4SM  ( lz4s via Memory Pointer )
-   LZ4SMN ( lz4s via Memory Pointer - no Hash Stream Checks )
+    LZ4 ( pure lz4 )
+    LZ4SS  ( lz4s via TMemoryStream )
+    LZ4SSN ( lz4s via TMemoryStream - no Hash Stream Checks )
+    LZ4SM  ( lz4s via Memory Pointer )
+    LZ4SMN ( lz4s via Memory Pointer - no Hash Stream Checks )
 
-   LZ4 Delphi Binding Library Test
+    LZ4 Delphi Binding Library Test
        LZ4:    276676254 ->    168943648 ( 61,06%),       436,13 MB/s
        LZ4:    276676254 <-    168943648 ( 61,06%),      1589,51 MB/s
 
