@@ -50,3 +50,6 @@
 # Delphi history and backups
 __history/
 *.~*
+lz4d_test.dproj
+lz4d_test.res
+Win32/
