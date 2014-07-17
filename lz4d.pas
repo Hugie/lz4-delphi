@@ -32,6 +32,11 @@ Lz4 and xxHash by Yann Collet: https://github.com/Cyan4973
 }
 
 {
+  17.07.14
+  Version 1.1 - bugfix on calloc implementation. If lz4 with Heapmode=1 is used, lib crashed
+              - update lz4 to r119 due to a win32 related security fix
+
+  16.07.14
   Version 1.0 - Initial release
 }
 
@@ -131,9 +136,14 @@ class function TLZ4.Decode(
   const ASourceSize,
         ATargetSize:  Int64)
   : Int64;
+var
+  LResult: Integer;
 begin
-  Result := LZ4_decompress_safe( ASourcePtr, ATargetPtr, ASourceSize, ATargetSize );
-  //Result := LZ4_decompress_fast( ASourcePtr, ATargetPtr, ATargetSize );
+  Result  := LZ4_decompress_safe( ASourcePtr, ATargetPtr, ASourceSize, ATargetSize );
+
+// decompress_fast returns the amount of READ bytes - not the output size
+//  LResult := LZ4_decompress_fast( ASourcePtr, ATargetPtr, ATargetSize );
+//  Result  := ATargetSize;
 end;
 
 

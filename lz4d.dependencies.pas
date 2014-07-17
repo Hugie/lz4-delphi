@@ -78,10 +78,10 @@ interface
 
 {$IfDef VS_LIB}
   ///Visual studio uses different function names
-  function  __imp__calloc(size: cardinal): Pointer; cdecl;
+  function  __imp__calloc(count, size: cardinal): Pointer; cdecl;
   procedure __imp__free(P: Pointer); cdecl;
 {$Else}
-  function  _calloc(size: cardinal): Pointer; cdecl;
+  function  _calloc(count, size: cardinal): Pointer; cdecl;
   procedure _free(P: Pointer); cdecl;
 {$EndIf}
 
@@ -93,13 +93,13 @@ function  _memset(P: Pointer; B: Integer; count: Integer): pointer; cdecl;
 implementation
 
 {$IfDef VS_LIB}
-  function  __imp__calloc(size: cardinal): Pointer; cdecl;
+  function  __imp__calloc(count, size: cardinal): Pointer; cdecl;
 {$Else}
-  function  _calloc(size: cardinal): Pointer; cdecl;
+  function  _calloc(count, size: cardinal): Pointer; cdecl;
 {$EndIf}
 begin
-  GetMem(Result, size);
-  FillChar(Result^, size, 0);
+  GetMem(   Result,   count*size);
+  FillChar( Result^,  count*size, 0);
 end;
 
 {$IfDef VS_LIB}

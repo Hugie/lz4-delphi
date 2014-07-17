@@ -7,12 +7,12 @@ Includes easy-to-use wrapper class and an default mode implementation of the new
 
 A Binding for xxHash is also present, since it is necessary for lz4s;
 
-Lz4 Version [r118](https://code.google.com/p/lz4/source/detail?r=118);
+Lz4 Version [r119](https://code.google.com/p/lz4/source/detail?r=119);
 
 Object Files
 ==========
 
-Contributed binaries are build using MinGW 4.8.1. and the default sourcecode by Yann Collet: [lz4](https://code.google.com/p/lz4/) and [xxHash](https://code.google.com/p/xxhash/).
+Contributed binaries are build using MinGW 4.8.1. and the original sourcecode by Yann Collet: [lz4](https://code.google.com/p/lz4/) and [xxHash](https://code.google.com/p/xxhash/).
 
 Compability
 ===========

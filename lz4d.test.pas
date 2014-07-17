@@ -33,7 +33,11 @@ Lz4 and xxHash by Yann Collet: https://github.com/Cyan4973
 
 unit lz4d.test;
 
-{$Define WithSynLZTest}
+// - include speed comparism to SynLZ
+{.$Define WithSynLZTest}
+
+// - write out temp results to files, to be compare and tesable with external Lz4 tools
+{.$Define WriteOutResults}
 
 interface
 
@@ -52,6 +56,7 @@ procedure lz4dtest( AMemStream: TMemoryStream);
 implementation
 
 uses
+  System.Math,
   System.SysUtils;
 
 const
@@ -101,6 +106,9 @@ procedure TestRun( AFunc: TTestMemoryFunc;  AFuncName: String;  AInPtr, AOutPtr:
 var
   LCounter: Integer;
 begin
+  //reset time value to max to allow min(timeA, timeB) for fastest run
+  if (AEncode) then ATestData.TimeEncMs := $7FFFFFFFFFFFFF else ATestData.TimeDecMs := $7FFFFFFFFFFFFF;
+
   for LCounter := 1 to CIterCount do
   begin
     AFunc ( AInPtr, AOutPtr, AInSize, AOutSize, ATestData );
@@ -138,7 +146,7 @@ begin
     LTimer := TStopwatch.StartNew();
     ATestData.SizeRaw   := AInSize;
     ATestData.SizeEnc   := SynLZcompress1asm( PAnsiChar(AInPtr), AOutSize, PAnsiChar(AOutPtr) );
-    ATestData.TimeEncMs := LTimer.ElapsedMilliseconds;
+    ATestData.TimeEncMs := Min(LTimer.ElapsedMilliseconds, ATestData.TimeEncMs);
   except
     on E: Exception do
       Writeln(E.ClassName, ': ', E.Message);
@@ -153,7 +161,7 @@ begin
     LTimer := TStopwatch.StartNew();
     ATestData.SizeRaw   := SynLZdecompress1asm( PAnsiChar(AInPtr), AInSize, PAnsiChar(AOutPtr));
     ATestData.SizeEnc   := AInSize;
-    ATestData.TimeDecMs := LTimer.ElapsedMilliseconds;
+    ATestData.TimeDecMs := Min(LTimer.ElapsedMilliseconds, ATestData.TimeDecMs);
   except
     on E: Exception do
       Writeln(E.ClassName, ': ', E.Message);
@@ -171,7 +179,7 @@ begin
     LTimer := TStopwatch.StartNew();
     ATestData.SizeRaw     := AInSize;
     ATestData.SizeEnc     := TLZ4.Encode( AInPtr, AOutPtr, AInSize, AOutSize );
-    ATestData.TimeEncMs   := LTimer.ElapsedMilliseconds;
+    ATestData.TimeEncMs   := Min(LTimer.ElapsedMilliseconds, ATestData.TimeEncMs);
 
   except
     on E: Exception do
@@ -187,7 +195,7 @@ begin
     LTimer := TStopwatch.StartNew();
     ATestData.SizeRaw   := TLZ4.Decode(AInPtr, AOutPtr, AInSize, AOutSize );
     ATestData.SizeEnc   := AInSize;
-    ATestData.TimeDecMs := LTimer.ElapsedMilliseconds;
+    ATestData.TimeDecMs := Min(LTimer.ElapsedMilliseconds, ATestData.TimeDecMs);
   except
     on E: Exception do
       Writeln(E.ClassName, ': ', E.Message);
@@ -203,7 +211,7 @@ begin
     LTimer := TStopwatch.StartNew();
     ATestData.SizeRaw     := AInSize;
     ATestData.SizeEnc     := TLZ4.Stream_Encode( AInPtr, AOutPtr, AInSize, AOutSize );
-    ATestData.TimeEncMs   := LTimer.ElapsedMilliseconds;
+    ATestData.TimeEncMs   := Min(LTimer.ElapsedMilliseconds, ATestData.TimeEncMs);
 
   except
     on E: Exception do
@@ -219,7 +227,7 @@ begin
     LTimer := TStopwatch.StartNew();
     ATestData.SizeRaw     := AInSize;
     ATestData.SizeEnc     := TLZ4.Stream_Encode( AInPtr, AOutPtr, AInSize, AOutSize, sbs4MB, False );
-    ATestData.TimeEncMs   := LTimer.ElapsedMilliseconds;
+    ATestData.TimeEncMs   := Min(LTimer.ElapsedMilliseconds, ATestData.TimeEncMs);
 
   except
     on E: Exception do
@@ -237,7 +245,7 @@ begin
   LTimer := TStopwatch.StartNew();
   ATestData.SizeRaw   := ASourceStream.Size;
   ATestData.SizeEnc   := TLZ4.Stream_Encode( ASourceStream, ATargetStream );
-  ATestData.TimeEncMs := LTimer.ElapsedMilliseconds;
+  ATestData.TimeEncMs := Min(LTimer.ElapsedMilliseconds, ATestData.TimeEncMs);
 end;
 
 procedure Test_lz4s_Encode_Stream_NoCheck( ASourceStream, ATargetStream: TStream; var ATestData: TTestResult);
@@ -250,7 +258,7 @@ begin
   LTimer := TStopwatch.StartNew();
   ATestData.SizeRaw   := ASourceStream.Size;
   ATestData.SizeEnc   := TLZ4.Stream_Encode( ASourceStream, ATargetStream, sbs4MB, False );
-  ATestData.TimeEncMs := LTimer.ElapsedMilliseconds;
+  ATestData.TimeEncMs := Min(LTimer.ElapsedMilliseconds, ATestData.TimeEncMs);
 end;
 
 procedure Test_lz4s_Decode_Stream( ASourceStream, ATargetStream: TStream; var ATestData: TTestResult);
@@ -274,7 +282,7 @@ begin
     LTimer := TStopwatch.StartNew();
     ATestData.SizeRaw     := TLZ4.Stream_Decode( AInPtr, AOutPtr, AInSize, AOutSize );
     ATestData.SizeEnc     := AInSize;
-    ATestData.TimeDecMs   := LTimer.ElapsedMilliseconds;
+    ATestData.TimeDecMs := Min(LTimer.ElapsedMilliseconds, ATestData.TimeDecMs);
 
   except
     on E: Exception do
@@ -310,19 +318,23 @@ begin
   TestRun( Test_lz4_Encode, 'LZ4', LSource.Memory, LTarget.Memory, LSource.Size, LTarget.Size, LResult, true );
   Writeln('');
 
+  {$IFDEF WriteOutResults}
   LTarget.Position := 0;
   LOutFile := TFileStream.Create('LZ4.enc', fmCreate);
   LOutFile.CopyFrom( LTarget, LResult.SizeEnc );
   LOutFile.Free;
+  {$Endif}
 
   LInSize := LResult.SizeEnc;
   TestRun( Test_lz4_Decode, 'LZ4', LTarget.Memory, LSource.Memory, LInSize, LSource.Size, LResult, false );
   Writeln(#10#13);
 
+  {$IFDEF WriteOutResults}
   LSource.Position := 0;
   LOutFile := TFileStream.Create('LZ4.dec', fmCreate);
   LOutFile.CopyFrom( LSource, LResult.SizeRaw );
   LOutFile.Free;
+  {$ENDIF}
 
   //compare Data:
   if not CompareMem( AMemStream.Memory, LSource.Memory, AMemstream.Size ) then
@@ -337,18 +349,22 @@ begin
   TestRun( Test_lz4s_Encode_Stream, 'LZ4SS', LSource, LTarget, LResult, true );
   Writeln('');
 
+  {$IFDEF WriteOutResults}
   LTarget.Position := 0;
   LOutFile := TFileStream.Create('LZ4SS.enc', fmCreate);
   LOutFile.CopyFrom( LTarget, LResult.SizeEnc );
   LOutFile.Free;
+  {$ENDIF}
 
   TestRun( Test_lz4s_Decode_Stream, 'LZ4SS', LTarget, LSource, LResult, false );
   Writeln(#10#13);
 
+  {$IFDEF WriteOutResults}
   LSource.Position := 0;
   LOutFile := TFileStream.Create('LZ4SS.dec', fmCreate);
   LOutFile.CopyFrom( LSource, LResult.SizeRaw );
   LOutFile.Free;
+  {$ENDIF}
 
   //compare Data:
   if not CompareMem( AMemStream.Memory, LSource.Memory, AMemstream.Size ) then
@@ -363,18 +379,22 @@ begin
   TestRun( Test_lz4s_Encode_Stream_NoCheck, 'LZ4SSN', LSource, LTarget, LResult, true );
   Writeln('');
 
+  {$IFDEF WriteOutResults}
   LTarget.Position := 0;
   LOutFile := TFileStream.Create('LZ4SSN.enc', fmCreate);
   LOutFile.CopyFrom( LTarget, LResult.SizeEnc );
   LOutFile.Free;
+  {$ENDIF}
 
   TestRun( Test_lz4s_Decode_Stream, 'LZ4SSN', LTarget, LSource, LResult, false );
   Writeln(#10#13);
 
+  {$IFDEF WriteOutResults}
   LSource.Position := 0;
   LOutFile := TFileStream.Create('LZ4SSN.dec', fmCreate);
   LOutFile.CopyFrom( LSource, LResult.SizeRaw );
   LOutFile.Free;
+  {$ENDIF}
 
   //compare Data:
   if not CompareMem( AMemStream.Memory, LSource.Memory, AMemstream.Size ) then
@@ -389,19 +409,23 @@ begin
   TestRun( Test_lz4s_Encode_Memory, 'LZ4SM', LSource.Memory, LTarget.Memory, LSource.Size, LTarget.Size, LResult, true );
   Writeln('');
 
+  {$IFDEF WriteOutResults}
   LTarget.Position := 0;
   LOutFile := TFileStream.Create('LZ4SM.enc', fmCreate);
   LOutFile.CopyFrom( LTarget, LResult.SizeEnc );
   LOutFile.Free;
+  {$ENDIF}
 
   LInSize := LResult.SizeEnc;
   TestRun( Test_lz4s_Decode_Memory, 'LZ4SM', LTarget.Memory, LSource.Memory, LInSize, LSource.Size, LResult, false );
   Writeln(#10#13);
 
+  {$IFDEF WriteOutResults}
   LSource.Position := 0;
   LOutFile := TFileStream.Create('LZ4SM.dec', fmCreate);
   LOutFile.CopyFrom( LSource, LResult.SizeRaw );
   LOutFile.Free;
+  {$ENDIF}
 
   //compare Data:
   if not CompareMem( AMemStream.Memory, LSource.Memory, AMemstream.Size ) then
@@ -416,20 +440,24 @@ begin
   TestRun( Test_lz4s_Encode_Memory_NoCheck, 'LZ4SMN', LSource.Memory, LTarget.Memory, LSource.Size, LTarget.Size, LResult, true );
   Writeln('');
 
+  {$IFDEF WriteOutResults}
   LTarget.Position := 0;
   LOutFile := TFileStream.Create('LZ4SMN.enc', fmCreate);
   LOutFile.CopyFrom( LTarget, LResult.SizeEnc );
   LOutFile.Free;
+  {$ENDIF}
 
   //use standard decode function - since this is handled by stream header info
   LInSize := LResult.SizeEnc;
   TestRun( Test_lz4s_Decode_Memory, 'LZ4SMN', LTarget.Memory, LSource.Memory, LInSize, LSource.Size, LResult, false );
   Writeln(#10#13);
 
+  {$IFDEF WriteOutResults}
   LSource.Position := 0;
   LOutFile := TFileStream.Create('LZ4SMN.dec', fmCreate);
   LOutFile.CopyFrom( LSource, LResult.SizeRaw );
   LOutFile.Free;
+  {$ENDIF}
 
   //compare Data:
   if not CompareMem( AMemStream.Memory, LSource.Memory, AMemstream.Size ) then
@@ -438,12 +466,18 @@ begin
   Writeln('');
 
 
+  {$IFDEF WithSynLZTest}
   TestRun( Test_SynLZ_Encode, 'SynLZ', LSource.Memory, LTarget.Memory, LSource.Size, LTarget.Size, LResult, true );
   Writeln('');
 
   LInSize := LResult.SizeEnc;
   TestRun( Test_SynLZ_Decode, 'SynLZ', LTarget.Memory, LSource.Memory, LInSize, LSource.Size, LResult, false );
   Writeln(#10#13);
+  {$ENDIF}
+
+  //cleanup
+  LSource.Free;
+  LTarget.Free;
 end;
 
 end.

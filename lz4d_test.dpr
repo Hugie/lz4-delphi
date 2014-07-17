@@ -7,9 +7,6 @@ program lz4d_test;
 uses
   System.SysUtils,
   System.Classes,
-  System.Math,
-  Winapi.Windows,
-  System.Diagnostics,
   lz4d      in 'lz4d.pas',
   lz4d.lz4  in 'lz4d.lz4.pas',
   lz4d.lz4s in 'lz4d.lz4s.pas',
@@ -23,6 +20,11 @@ var
   LDummy:       String;
 
 begin
+  //preperations
+  // - we want 16byte block alignement
+  SetMinimumBlockAlignment(mba16Byte);
+
+
   Writeln('LZ4 Delphi Binding Library Test');
 
   if (System.ParamCount < 1) then
@@ -53,6 +55,8 @@ begin
       //work the memory
       lz4dtest( LMemStream );
 
+      //cleanup
+      LMemStream.Free;
     except
       on E: Exception do
         Writeln('Exception on testing: ' + E.ToString());
