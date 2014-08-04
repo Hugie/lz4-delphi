@@ -204,15 +204,15 @@ begin
 
     //create the basis stream descriptor
     if (AUseHash) then
-      LSD := lz4s_Encode_CreateDescriptor( CLZ4SDefault, Byte(LBlockID) )
+      LSD := lz4s_Encode_CreateDescriptor( CLZ4S_Enc_Default, Byte(LBlockID) )
     else
-      LSD := lz4s_Encode_CreateDescriptor( CLZ4SNoCheck, Byte(LBlockID) );
+      LSD := lz4s_Encode_CreateDescriptor( CLZ4S_Enc_NoChecksum, Byte(LBlockID) );
 
     //Try to encode the header
     LBytes  := lz4s_Encode_Header( LSD, LChunk, LChunkSize );
 
     //write data to stream
-    ATargetStream.WriteBuffer( LChunk^, LBytes );
+    ATargetStream.Write( LChunk^, LBytes );
     Inc(Result, LBytes);
 
     //process blocks of data until no data is left
@@ -229,7 +229,7 @@ begin
       LBytes := lz4s_Encode_Continue( LSD, LBlock, LChunk, LRead, LChunkSize);
 
       //write data to stream
-      ATargetStream.WriteBuffer( LChunk^, LBytes );
+      ATargetStream.Write( LChunk^, LBytes );
       Inc(Result, LBytes);
 
       //save dictionary - and store location pointer of dict inside stream struct
@@ -240,7 +240,7 @@ begin
     LBytes := lz4s_Encode_Footer( LSD, LChunk, LChunkSize );
 
     //write data to stream
-    ATargetStream.WriteBuffer( LChunk^, LBytes );
+    ATargetStream.Write( LChunk^, LBytes );
     Inc(Result, LBytes);
 
   finally
@@ -338,11 +338,8 @@ begin
     //read footer - its 4 bytes
     LBytes := ASourceStream.Read( LBuffer^, CFooterSize );
 
-    if (LBytes < CFooterSize) then
-      raise Exception.Create('LZ4D: not enough stream data available to decode footer.');
-
     //check agains stream hash - throws exception if it fails
-    lz4s_Decode_Stream_Footer( LSD, LBuffer, CFooterSize );
+    lz4s_Decode_Stream_Footer( LSD, LBuffer, LBytes );
   finally
     //cleanup
     lz4s_FreeDescriptor( LSD );
@@ -470,9 +467,9 @@ begin
 
     //create the basis stream descriptor
     if (AUseHash) then
-      LSD := lz4s_Encode_CreateDescriptor( CLZ4SDefault, Byte(LBlockID) )
+      LSD := lz4s_Encode_CreateDescriptor( CLZ4S_Enc_Default, Byte(LBlockID) )
     else
-      LSD := lz4s_Encode_CreateDescriptor( CLZ4SNoCheck, Byte(LBlockID) );
+      LSD := lz4s_Encode_CreateDescriptor( CLZ4S_Enc_NoChecksum, Byte(LBlockID) );
 
     //Try to encode the header
     LBytes  := lz4s_Encode_Header( LSD, ATarget+LOutPos, LChunkSize );

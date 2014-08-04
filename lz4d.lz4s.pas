@@ -66,8 +66,16 @@ type
     fPresetDictionary     = $01  // 00000001 b
     );
 
- const CLZ4SDefault = (Byte(fVersion) or Byte(fBlockIndependence) or Byte(fStreamChecksum)); // = 100 Dezimal
- const CLZ4SNoCheck = (Byte(fVersion) or Byte(fBlockIndependence));
+  //Standard encoding flags
+ const CLZ4S_Enc_Default    = (Byte(fVersion) or Byte(fBlockIndependence) or Byte(fStreamChecksum)); // = 100 Dezimal
+ const CLZ4S_Enc_NoChecksum = (Byte(fVersion) or Byte(fBlockIndependence));
+
+ //additional allowed decoding flags
+ const CLZ4S_Dec_Depend         = (Byte(fVersion) or Byte(fStreamChecksum));
+ const CLZ4S_Dec_Dep_NoChecksum = (Byte(fVersion));
+
+ const CLZ4SEncFlags = [CLZ4S_Enc_Default, CLZ4S_Enc_NoChecksum];
+ const CLZ4SDecFlags = [CLZ4S_Enc_Default, CLZ4S_Enc_NoChecksum, CLZ4S_Dec_Depend, CLZ4S_Dec_Dep_NoChecksum];
 
 type
   TLZ4BlockSize = (
@@ -195,51 +203,51 @@ begin
 end;
 
 
-  /// Make sure only the supported settings are used
-  function CheckSettings( const AFlags, ABlockSize: Byte; var VError: String ): Boolean;
+/// Make sure only the supported settings are used
+function CheckSettings( const AFlags, ABlockSize: Byte; var VError: String; AEncoding: Boolean ): Boolean;
+begin
+  VError := '';
+  Result := True;
+
+  if not (( AEncoding and (AFlags in CLZ4SEncFlags)) or (not AEncoding and (AFlags in CLZ4SDecFlags))) then
   begin
-    VError := '';
-    Result := True;
-
-    if (AFlags <> CLZ4SDefault) and (AFlags <> CLZ4SNoCheck) then
-    begin
-      VError := 'Unsupported stream description flags. Only "Default Mode" with or without Stream Hash is supported.';
-      Result := False;
-    end;
-
-    if not InRange( ABlockSize, Byte(Low(TLZ4BlockSize)), Byte(High(TLZ4BlockSize)) ) then
-    begin
-      VError := 'Unsupported block size. Only Mode 4-7 supported.';
-      Result := False;
-    end;
+    VError := 'Unsupported stream description flags. Only "Default Mode" with or without Stream Hash is supported.';
+    Result := False;
   end;
 
-  function lz4s_Encode_CreateDescriptor(const AFlags, ABlockSize: Byte): TLZ4StreamDescriptor;
-  var
-    LError: String;
+  if not InRange( ABlockSize, Byte(Low(TLZ4BlockSize)), Byte(High(TLZ4BlockSize)) ) then
   begin
-    //First thing: Verify Settings
-    if not CheckSettings( AFlags, ABlockSize, LError ) then
-      raise Exception.Create('LZ4S: Invalid stream header: ' + LError);
-
-    Result.Flags          := AFlags;
-    Result.BlockMaxSize   := ABlockSize;
-    Result.StreamSize     := 0;
-    Result.HeaderChecksum := 0;
-    Result.StreamData     := LZ4_createStream();
-
-    if (Result.StreamData = nil) then
-      raise Exception.Create('LZ4S: Could not create Stream data. LZ4_createStream failed');
+    VError := 'Unsupported block size. Only Mode 4-7 supported.';
+    Result := False;
   end;
+end;
+
+function lz4s_Encode_CreateDescriptor(const AFlags, ABlockSize: Byte): TLZ4StreamDescriptor;
+var
+  LError: String;
+begin
+  //First thing: Verify Settings
+  if not CheckSettings( AFlags, ABlockSize, LError, True ) then
+    raise Exception.Create('LZ4S: Invalid stream header: ' + LError);
+
+  Result.Flags          := AFlags;
+  Result.BlockMaxSize   := ABlockSize;
+  Result.StreamSize     := 0;
+  Result.HeaderChecksum := 0;
+  Result.StreamData     := LZ4_createStream();
+
+  if (Result.StreamData = nil) then
+    raise Exception.Create('LZ4S: Could not create Stream data. LZ4_createStream failed');
+end;
 
 
-  procedure lz4s_FreeDescriptor( var AStreamDescriptor: TLZ4StreamDescriptor );
-  begin
-    if (AStreamDescriptor.StreamData <> nil) then
-      LZ4_free( AStreamDescriptor.StreamData );
+procedure lz4s_FreeDescriptor( var AStreamDescriptor: TLZ4StreamDescriptor );
+begin
+  if (AStreamDescriptor.StreamData <> nil) then
+    LZ4_free( AStreamDescriptor.StreamData );
 
-    FillChar( AStreamDescriptor, SizeOf(TLZ4StreamDescriptor), 0 );
-  end;
+  FillChar( AStreamDescriptor, SizeOf(TLZ4StreamDescriptor), 0 );
+end;
 
 function  lz4s_Encode_Header(
   var   AStreamDescriptor:  TLZ4StreamDescriptor;
@@ -409,7 +417,7 @@ begin
     raise Exception.Create('LZ4S: Header Checksum differs. Corrupt Header.');
 
   //check for supported header modes
-  if not CheckSettings( AStreamDescriptor.Flags, AStreamDescriptor.BlockMaxSize, LError ) then
+  if not CheckSettings( AStreamDescriptor.Flags, AStreamDescriptor.BlockMaxSize, LError, False) then
     raise Exception.Create('LZ4S: Invalid stream header: ' + LError);
 
     //reinit XXH32 stuff - if necessary
