@@ -199,7 +199,8 @@ end;
 
 function lz4s_size_stream_block_max(  ABlocksize: TLZ4BlockSize ): Cardinal;
 begin
-  Result := lz4s_size_block_max( ABlocksize ) + LZ4S_CACHELINE;
+  // datablock + header + footer
+  Result := lz4s_size_block_max( ABlocksize ) + 4 + 4;
 end;
 
 
@@ -244,7 +245,7 @@ end;
 procedure lz4s_FreeDescriptor( var AStreamDescriptor: TLZ4StreamDescriptor );
 begin
   if (AStreamDescriptor.StreamData <> nil) then
-    LZ4_free( AStreamDescriptor.StreamData );
+    LZ4_freeStream( AStreamDescriptor.StreamData );
 
   FillChar( AStreamDescriptor, SizeOf(TLZ4StreamDescriptor), 0 );
 end;
@@ -320,7 +321,7 @@ begin
   // - first 4 bytes contains the Compressed/Uncompressed Flag + Block size
   // - write compressed data to the follow up bytes
   LBytePtr  := ATargetPtr;
-  LOutBytes := LZ4_compress_continue( AStreamDescriptor.StreamData, ASourcePtr, LBytePtr+4, ASourceSize );
+  LOutBytes := LZ4_compress_limitedOutput_continue( AStreamDescriptor.StreamData, ASourcePtr, LBytePtr+4, ASourceSize, ATargetSize-8 );
 
   //<=0 means no compression happend - store it uncompressed
   if (LOutBytes > 0) then
@@ -481,7 +482,8 @@ var
   LBlockSize:   Cardinal;
   LDecompBytes: Integer;
 begin
-  Result := 0;
+  Result        := 0;
+  LDecompBytes  := 0;
 
   //first - read block header
   LBlockSize := PCardinal( ASourcePtr )^;
@@ -500,11 +502,16 @@ begin
   if (ASourceSize < LBlockSize+4) then
     raise Exception.Create('LZ4S: Block decode error. Given Block data is incomplete.');
 
-  // if highes bit of blocksize is 0, then the block is compressed
+  // if highest bit of blocksize is 0, then the block is compressed
   if (LCompressed) then
   begin
     // * compressed block * //
     LDecompBytes := LZ4_decompress_safe_continue( AStreamDescriptor.StreamData, (ASourcePtr+4), ATargetPtr, LBlockSize, ATargetSize );
+
+    //check for errors
+    if (LDecompBytes < 0) then
+      raise Exception.Create(Format('Decompression Error: %d', [LDecompBytes]));
+
     Result := LDecompBytes;
   end
   else

@@ -1,5 +1,5 @@
 ////////////////// xxHash.h binding file /////////////////////
-/// Version: r34
+/// Version: r36
 /// Author: Hanno Hugenberg
 
 {
@@ -86,11 +86,11 @@ interface
 ///    which would be usaly provided by the object file linker
 ///  - see dependency units for more informations
 
-uses
 {$IfDef ResolveMissingDependencies}
+uses
   lz4d.dependencies;
 {$Else}
-  ;
+
 {$Endif}
 
 
@@ -99,11 +99,6 @@ uses
 // Type
 //****************************
 type XXH_errorcode = ( XXH_OK=0, XXH_ERROR ) ;
-
-//const XXH32_SIZEOFSTATE = 48;
-//type XXH32_stateSpace_t = packed record (
-//  long long ll[(XXH32_SIZEOFSTATE+(sizeof(long long)-1))/sizeof(long long)];
-//  );
 
 //****************************
 // Simple Hash Functions
@@ -117,12 +112,15 @@ type XXH_errorcode = ( XXH_OK=0, XXH_ERROR ) ;
 //    Speed on Core 2 Duo @ 3 GHz (single thread, SMHasher benchmark) : 5.4 GB/s
 //    Note that "len" is type "int", which means it is limited to 2^31-1.
 //    If your data is larger, use the advanced functions below.
+//XXH64() :
+//    Calculate the 64-bits hash of sequence of length "len" stored at memory address "input".
 
 
 //Compiler error:
 // [dcc32 Fehler] xxHash.pas(118): E2065 Ungenügende Forward- oder External-Deklaration: 'XXH32'
 
-//function XXH32 (const AInput: Pointer; ALength: Integer; ASeed: Cardinal): Cardinal; cdecl; external name '_XXH32';
+//function XXH32 (const AInput: Pointer; ALength: Integer; ASeed: Cardinal):  Cardinal; cdecl; external name '_XXH32';
+function XXH64 (const AInput: Pointer; ALength: Integer; ASeed: UInt64):    UInt64;   cdecl; external name '_XXH64';
 
 //****************************
 // Advanced Hash Functions
@@ -132,61 +130,61 @@ type XXH_errorcode = ( XXH_OK=0, XXH_ERROR ) ;
 //as opposed to an input provided as a single block.
 //
 //It must be started with :
-//void* XXH32_init()
+//void* XXHnn_init()
 //The function returns a pointer which holds the state of calculation.
 //
 //This pointer must be provided as "void* state" parameter for XXH32_update().
-//XXH32_update() can be called as many times as necessary.
+//XXHnn_update() can be called as many times as necessary.
 //The user must provide a valid (allocated) input.
 //The function returns an error code, with 0 meaning OK, and any other value meaning there is an error.
 //Note that "len" is type "int", which means it is limited to 2^31-1.
 //If your data is larger, it is recommended to chunk your data into blocks
 //of size for example 2^30 (1GB) to avoid any "int" overflow issue.
 //
-//Finally, you can end the calculation anytime, by using XXH32_digest().
-//This function returns the final 32-bits hash.
-//You must provide the same "void* state" parameter created by XXH32_init().
-//Memory will be freed by XXH32_digest().
+//Finally, you can end the calculation anytime, by using XXHnn_digest().
+//This function returns the final nn-bits hash.
+//You must provide the same "void* state" parameter created by XXHnn_init().
+//Memory will be freed by XXHnn_digest().
 
 function XXH32_init   (ASeed: Cardinal): Pointer; cdecl; external name '_XXH32_init';
 function XXH32_update (const AState, AInput: Pointer; ALength: Integer): XXH_errorcode; cdecl; external name '_XXH32_update';
 function XXH32_digest (const AState: Pointer): Cardinal; cdecl; external name '_XXH32_digest';
 
 
+function XXH64_init   (ASeed: UInt64): Pointer; cdecl; external name '_XXH64_init';
+function XXH64_update (const AState, AInput: Pointer; ALength: Integer): XXH_errorcode; cdecl; external name '_XXH64_update';
+function XXH64_digest (const AState: Pointer): UInt64; cdecl; external name '_XXH64_digest';
+
 //These functions allow user application to make its own allocation for state.
 //
-//XXH32_sizeofState() is used to know how much space must be allocated for the xxHash 32-bits state.
+//XXHnn_sizeofState() is used to know how much space must be allocated for the xxHash nn-bits state.
 //Note that the state must be aligned to access 'long long' fields. Memory must be allocated and referenced by a pointer.
-//This pointer must then be provided as 'state' into XXH32_resetState(), which initializes the state.
+//This pointer must then be provided as 'state' into XXHnn_resetState(), which initializes the state.
 //
 //For static allocation purposes (such as allocation on stack, or freestanding systems without malloc()),
-//use the structure XXH32_stateSpace_t, which will ensure that memory space is large enough and correctly aligned to access 'long long' fields.
+//use the structure XXHnn_stateSpace_t, which will ensure that memory space is large enough and correctly aligned to access 'long long' fields.
 
 function XXH32_sizeofState(): Integer; cdecl; external name '_XXH32_sizeofState';
 function XXH32_resetState(AState: Pointer; ASeed: Cardinal): XXH_errorcode; cdecl; external name '_XXH32_resetState';
 
+//#define       XXH32_SIZEOFSTATE 48
+//typedef struct { long long ll[(XXH32_SIZEOFSTATE+(sizeof(long long)-1))/sizeof(long long)]; } XXH32_stateSpace_t;
 
-//This function does the same as XXH32_digest(), generating a 32-bit hash,
+function XXH64_sizeofState(): Integer; cdecl; external name '_XXH64_sizeofState';
+function XXH64_resetState(AState: Pointer; ASeed: Cardinal): XXH_errorcode; cdecl; external name '_XXH64_resetState';
+
+//#define       XXH64_SIZEOFSTATE 88
+//typedef struct { long long ll[(XXH64_SIZEOFSTATE+(sizeof(long long)-1))/sizeof(long long)]; } XXH64_stateSpace_t;
+
+
+//This function does the same as XXHnn_digest(), generating a nn-bit hash,
 //but preserve memory context.
-//This way, it becomes possible to generate intermediate hashes, and then continue feeding data with XXH32_update().
-//To free memory context, use XXH32_digest(), or free().
-
+//This way, it becomes possible to generate intermediate hashes, and then continue feeding data with XXHnn_update().
+//To free memory context, use XXHnn_digest(), or free().
 
 function XXH32_intermediateDigest( AState: Pointer): Cardinal; cdecl; external name '_XXH32_intermediateDigest';
-///*
+function XXH64_intermediateDigest( AState: Pointer): Cardinal; cdecl; external name '_XXH64_intermediateDigest';
 
-//*/
-//
-//
-//
-////****************************
-//// Deprecated function names
-////****************************
-//// The following translations are provided to ease code transition
-//// You are encouraged to no longer this function names
-//#define XXH32_feed   XXH32_update
-//#define XXH32_result XXH32_digest
-//#define XXH32_getIntermediateResult XXH32_intermediateDigest
 
 implementation
 

@@ -73,8 +73,11 @@ uses
 ///
 ///
 const LZ4_VERSION_MAJOR   = 1; // for major interface/format changes
-const LZ4_VERSION_MINOR   = 2; // for minor interface/format changes
-const LZ4_VERSION_RELEASE = 0; // for tweaks, bug-fixes, or development
+const LZ4_VERSION_MINOR   = 3; // for minor interface/format changes
+const LZ4_VERSION_RELEASE = 1; // for tweaks, bug-fixes, or development
+const LZ4_VERSION_NUMBER  = LZ4_VERSION_MAJOR*100*100 + LZ4_VERSION_MINOR*100 + LZ4_VERSION_RELEASE;
+
+function LZ4_versionNumber (): Integer; cdecl; external name '_LZ4_versionNumber';
 
 
 ///**************************************
@@ -163,6 +166,17 @@ function LZ4_compressBound(ASize: Integer): Integer; cdecl; external name '_LZ4_
 
 function LZ4_compress_limitedOutput (const ASource: Pointer; ADestination: Pointer; AInputSize, AMaxOutputSize: Integer): Integer; cdecl; external name '_LZ4_compress_limitedOutput';
 
+
+
+//LZ4_compress_withState() :
+//    Same compression functions, but using an externally allocated memory space to store compression state.
+//    Use LZ4_sizeofState() to know how much memory must be allocated,
+//    and then, provide it as 'void* state' to compression functions.
+
+function LZ4_sizeofState(): Integer; cdecl; external name '_LZ4_sizeofState';
+function LZ4_compress_withState (Astate: Pointer; ASource: Pointer; ADestination: Pointer; AInputSize: Integer): Integer; external name '_LZ4_compress_withState';
+function LZ4_compress_limitedOutput_withState (Astate: Pointer; ASource: Pointer; ADestination: Pointer; AInputSize: Integer; AMaxOutputSize: Integer): Integer; external name '_LZ4_compress_limitedOutput_withState';
+
 ///*
 //LZ4_decompress_fast() :
 //originalSize : is the original and therefore uncompressed size
@@ -216,7 +230,7 @@ type LZ4_stream_t = record
 //* LZ4_free just frees it.
 //*/
 function LZ4_createStream(): Pointer;             cdecl; external name '_LZ4_createStream';
-function LZ4_free(ALZ4_Stream: Pointer): Integer; cdecl; external name '_LZ4_free';
+function LZ4_freeStream(ALZ4_Stream: Pointer): Integer; cdecl; external name '_LZ4_freeStream';
 
 ///*
 //* LZ4_loadDict
@@ -268,6 +282,17 @@ type LZ4_streamDecode_t = record
     Values: Array[0..LZ4_STREAMDECODESIZE_U32-1] of Cardinal;
   end;
 
+
+///*
+// * LZ4_setStreamDecode
+// * Use this function to instruct where to find the dictionary.
+// * This function can be used to specify a static dictionary,
+// * or to instruct where to find some previously decoded data saved into a different memory space.
+// * Setting a size of 0 is allowed (same effect as no dictionary).
+// * Return : 1 if OK, 0 if error
+// */
+function LZ4_setStreamDecode (ALZ4_streamDecode: Pointer; const Aictionary: Pointer; ADictSize: Integer): Integer; cdecl; external name '_LZ4_setStreamDecode';
+
 ///*
 //* If you prefer dynamic allocation methods,
 //* LZ4_createStreamDecode()
@@ -275,7 +300,8 @@ type LZ4_streamDecode_t = record
 //* LZ4_free just frees it.
 //*/
 
-function LZ4_createStreamDecode(): Pointer;       cdecl; external name '_LZ4_createStreamDecode';
+function LZ4_createStreamDecode(): Pointer;                         cdecl; external name '_LZ4_createStreamDecode';
+function LZ4_freeStreamDecode(ALZ4_streamDecode: Pointer): Integer; cdecl; external name '_LZ4_freeStreamDecode';
 
 //int LZ4_free (void* LZ4_stream); /* yes, it's the same one as for compression */
 //function LZ4_free(ALZ4_Stream: Pointer): Integer; cdecl; external name '_LZ4_free';
@@ -290,16 +316,6 @@ function LZ4_createStreamDecode(): Pointer;       cdecl; external name '_LZ4_cre
 
 function LZ4_decompress_safe_continue (ALZ4_streamDecode: Pointer; const ASource: Pointer; ADestination: Pointer; ACompressedSize, AMaxOutputSize: Integer): Integer; cdecl; external name '_LZ4_decompress_safe_continue';
 function LZ4_decompress_fast_continue (ALZ4_streamDecode: Pointer; const ASource: Pointer; ADestination: Pointer; AOriginalSize: Integer): Integer;                   cdecl; external name '_LZ4_decompress_fast_continue';
-
-///*
-//* LZ4_setDictDecode
-//* Use this function to instruct where to find the dictionary.
-//* This function can be used to specify a static dictionary,
-//* or to instruct where to find some previously decoded data saved into a different memory space.
-//* Setting a size of 0 is allowed (same effect as no dictionary).
-//* Return : 1 if OK, 0 if error
-//*/
-function LZ4_setDictDecode (ALZ4_streamDecode: Pointer; const ADictionary: Pointer; ADictSize: Pointer): Integer; cdecl; external name '_LZ4_setDictDecode';
 
 ///*
 //Advanced decoding functions :

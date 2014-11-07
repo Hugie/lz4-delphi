@@ -96,6 +96,9 @@ type
     //stream decoding in memory
     class function Stream_Decode( const ASource, ATarget: PByte; const ASourceSize, ATargetSize: Int64 ): Int64; overload;
 
+    //test stream by searching for magic number and testcreating the header
+    class function Is_LZ4_Stream( const ASourceStream: TStream; const ARaiseException: Boolean = False ): Boolean;
+
   end;
 
 implementation
@@ -128,6 +131,51 @@ class function TLZ4.Encode(
   : Int64;
 begin
   Result := LZ4_compress( ASourcePtr, ATargetPtr, ASourceSize );
+end;
+
+class function TLZ4.Is_LZ4_Stream(const ASourceStream: TStream;  const ARaiseException: Boolean): Boolean;
+var
+  //stream data storage
+  LSD:          TLZ4StreamDescriptor;
+  //Header buffer
+  LHeader:      array[0..CCacheLine-1] of Byte;
+  //bytes available for writing
+  LBytes:       Integer;
+begin
+  Result := False;
+
+  //allocate (heap - slow) temp encoding data buffer
+
+  //first, try to parse the header - extract block size from it
+  LSD := lz4s_Decode_CreateDescriptor();
+
+  try
+    //header size is at least 7 bytes - read first chunk
+    LBytes := ASourceStream.Read( LHeader, CHeaderSize );
+    //go back to start
+    ASourceStream.Position := 0;
+
+    //check for a full header
+    if (LBytes <> CHeaderSize) then
+      if (ARaiseException) then
+        raise Exception.Create('LZ4S::Stream_Decode: Corrupt LZ4S Stream.')
+      else
+        Exit;
+
+    //Try to encode the header - calc how much bytes are left of buffer
+    try
+      lz4s_Decode_Stream_Header( LSD, @LHeader, LBytes );
+    except
+      Exit();
+    end;
+
+    //all fine - bye bye
+    Result := True;
+
+  finally
+    //cleanup
+    lz4s_FreeDescriptor( LSD );
+  end;
 end;
 
 class function TLZ4.Decode(
@@ -184,6 +232,10 @@ begin
     else      LBlockID := TLZ4BlockSize.bs_7;
   end;
 
+  LChunk := nil;
+  LBlock := nil;
+  LDict  := nil;
+
   try
     LRead := 0;
     //allocate (heap - slow) temp encoding data buffer
@@ -226,7 +278,7 @@ begin
       if (LRead <= 0) then break;
 
       //encode next block
-      LBytes := lz4s_Encode_Continue( LSD, LBlock, LChunk, LRead, LChunkSize);
+      LBytes := lz4s_Encode_Continue( LSD, LBlock, LChunk, LRead, LChunkSize );
 
       //write data to stream
       ATargetStream.Write( LChunk^, LBytes );
@@ -273,7 +325,8 @@ var
   LOverflow:    Cardinal;
   LChunkSize:   Cardinal;
 begin
-  Result := 0;
+  Result  := 0;
+  LBuffer := nil;
   try
     // * Prepare Decoding * //
 
@@ -294,7 +347,7 @@ begin
 
     // - allocate once and share the data - uses memory locality and only one GetMem Call
     // - ring data is output data
-    LBufferSize   := lz4s_size_stream_block_max( TLZ4BlockSize(LSD.BlockMaxSize) );
+    LBufferSize   := lz4s_size_stream_block_max( TLZ4BlockSize(LSD.BlockMaxSize) ) * 2;
     // - block data is input data
     LBlockSize    := lz4s_size_block_max( TLZ4BlockSize(LSD.BlockMaxSize) );
 
@@ -383,7 +436,7 @@ begin
       raise Exception.Create('LZ4S::Stream_Decode: Corrupt LZ4S Stream.');
 
     //Try to decode the header
-    LBytes := lz4s_Decode_Stream_Header( LSD, ASource, LBytes );
+    LBytes := lz4s_Decode_Stream_Header( LSD, ASource, ASourceSize );
 
     //update position
     LInPos  := LBytes;

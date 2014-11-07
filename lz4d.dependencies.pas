@@ -86,8 +86,9 @@ interface
 {$EndIf}
 
 function  _malloc(size: cardinal): Pointer; cdecl;
-procedure _memcpy(dest, source: Pointer; count: Integer); cdecl;
+procedure _memcpy(dest, source: Pointer;  count: Integer); cdecl;
 function  _memset(P: Pointer; B: Integer; count: Integer): pointer; cdecl;
+procedure _memmove(dest, source: Pointer; count: Integer); cdecl;
 
 
 implementation
@@ -123,6 +124,11 @@ begin
 end;
 
 procedure _memcpy(dest, source: Pointer; count: Integer); cdecl;
+begin
+  Move(source^, dest^, count);
+end;
+
+procedure _memmove(dest, source: Pointer; count: Integer); cdecl;
 begin
   Move(source^, dest^, count);
 end;
