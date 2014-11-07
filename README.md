@@ -7,7 +7,7 @@ Includes easy-to-use wrapper class and an default mode implementation of the new
 
 A Binding for xxHash is also present, since it is necessary for lz4s;
 
-Lz4 Version [r119](https://code.google.com/p/lz4/source/detail?r=119);
+Lz4 Version [r123](https://code.google.com/p/lz4/source/detail?r=123);
 
 Object Files
 ==========
