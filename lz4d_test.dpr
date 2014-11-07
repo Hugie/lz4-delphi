@@ -7,11 +7,13 @@ program lz4d_test;
 uses
   System.SysUtils,
   System.Classes,
-  lz4d      in 'lz4d.pas',
-  lz4d.lz4  in 'lz4d.lz4.pas',
+  lz4d in 'lz4d.pas',
+  lz4d.lz4 in 'lz4d.lz4.pas',
+  lz4d.lz4frame in 'lz4d.lz4frame.pas',
+  lz4d.test in 'lz4d.test.pas',
   lz4d.lz4s in 'lz4d.lz4s.pas',
-  lz4d.test in 'lz4d.test.pas';
-
+  lz4d.dependencies in 'lz4d.dependencies.pas',
+  xxHash in 'xxHash.pas';
 
 var
   LFileStream:  TFileStream;
