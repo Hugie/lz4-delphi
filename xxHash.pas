@@ -119,7 +119,7 @@ type XXH_errorcode = ( XXH_OK=0, XXH_ERROR ) ;
 //Compiler error:
 // [dcc32 Fehler] xxHash.pas(118): E2065 Ungenügende Forward- oder External-Deklaration: 'XXH32'
 
-//function XXH32 (const AInput: Pointer; ALength: Integer; ASeed: Cardinal):  Cardinal; cdecl; external name '_XXH32';
+function XXH32 (const AInput: Pointer; ALength: Integer; ASeed: Cardinal):  Cardinal; cdecl; external name '_XXH32';
 function XXH64 (const AInput: Pointer; ALength: Integer; ASeed: UInt64):    UInt64;   cdecl; external name '_XXH64';
 
 //****************************
