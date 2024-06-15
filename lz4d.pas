@@ -383,7 +383,7 @@ begin
       raise Exception.Create('LZ4S::Stream_Decode: Corrupt LZ4S Stream.');
 
     //Try to decode the header
-    LBytes := lz4s_Decode_Stream_Header( LSD, ASource, LBytes );
+    LBytes := lz4s_Decode_Stream_Header( LSD, ASource, ASourceSize );
 
     //update position
     LInPos  := LBytes;
