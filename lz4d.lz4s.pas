@@ -350,7 +350,7 @@ function  lz4s_Encode_Footer(
 var
   L4BytePtr: PCardinal;
 begin
-  Result    := 0;
+//  Result    := 0;
   L4BytePtr := ATargetPtr;
 
   if (ATargetSize < 4) then
@@ -391,7 +391,7 @@ var
   LHash: Cardinal;
   LError : String;
 begin
-  Result := 0;
+//  Result := 0;
 
   if (ASourceSize < 7)  then
     raise Exception.Create('LZ4S: Decoding Data too small for default header informations.');
@@ -481,7 +481,7 @@ var
   LBlockSize:   Cardinal;
   LDecompBytes: Integer;
 begin
-  Result := 0;
+//  Result := 0;
 
   //first - read block header
   LBlockSize := PCardinal( ASourcePtr )^;

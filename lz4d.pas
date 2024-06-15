@@ -136,8 +136,8 @@ class function TLZ4.Decode(
   const ASourceSize,
         ATargetSize:  Int64)
   : Int64;
-var
-  LResult: Integer;
+//var
+//  LResult: Integer;
 begin
   Result  := LZ4_decompress_safe( ASourcePtr, ATargetPtr, ASourceSize, ATargetSize );
 
@@ -184,8 +184,11 @@ begin
     else      LBlockID := TLZ4BlockSize.bs_7;
   end;
 
+  LChunk := nil;
+  LBlock := nil;
+  LDict := nil;
   try
-    LRead := 0;
+//    LRead := 0;
     //allocate (heap - slow) temp encoding data buffer
     // - block (ring) data is input data
     LBlockSize  := lz4s_size_block_max( LBlockID );
@@ -270,10 +273,11 @@ var
   LBlock:       PByte;
   LBlockSize:   Cardinal;
   //overflow - amount of stream bytes still available, e.g. already next block data
-  LOverflow:    Cardinal;
+//  LOverflow:    Cardinal;
   LChunkSize:   Cardinal;
 begin
   Result := 0;
+  LBuffer := nil;
   try
     // * Prepare Decoding * //
 
@@ -304,7 +308,7 @@ begin
     LBlock        := (LBuffer + LBufferSize);
 
     //we start with 0 overflow of bytes
-    LOverflow   := 0;
+    //LOverflow   := 0;
 
     // * Start Decoding * //
 
@@ -367,9 +371,9 @@ var
   LInPos, LOutPos:  Int64;
   LBytesLeft:       Cardinal;
   //stream block data element size
-  LChunkSize:       Cardinal;
+//  LChunkSize:       Cardinal;
 begin
-  Result := 0;
+//  Result := 0;
   try
     // * Prepare Decoding * //
 
@@ -383,7 +387,7 @@ begin
       raise Exception.Create('LZ4S::Stream_Decode: Corrupt LZ4S Stream.');
 
     //Try to decode the header
-    LBytes := lz4s_Decode_Stream_Header( LSD, ASource, LBytes );
+    LBytes := lz4s_Decode_Stream_Header( LSD, ASource, ASourceSize );
 
     //update position
     LInPos  := LBytes;
@@ -442,7 +446,7 @@ var
   LBytes:     Cardinal;
 begin
   // * Prepare Encoding * //
-  Result := 0;
+//  Result := 0;
 
   //map block size
   case ABlockSize of
