@@ -118,3 +118,16 @@ Win32/
 /test/delphi_10.1/lz4d_test.dproj.user
 /test/delphi_10.1/lz4d_test.res
 /test/delphi_10.1/lz4d_test.stat
+/test/delphi_10.3/LZ4.dec
+/test/delphi_10.3/LZ4.enc
+/test/delphi_10.3/LZ4SM.dec
+/test/delphi_10.3/LZ4SM.enc
+/test/delphi_10.3/LZ4SMN.dec
+/test/delphi_10.3/LZ4SMN.enc
+/test/delphi_10.3/LZ4SS.dec
+/test/delphi_10.3/LZ4SS.enc
+/test/delphi_10.3/LZ4SSN.dec
+/test/delphi_10.3/LZ4SSN.enc
+/test/delphi_10.3/lz4d_test.dproj.user
+/test/delphi_10.3/lz4d_test.res
+/test/delphi_10.3/lz4d_test.stat
