@@ -154,3 +154,6 @@ Win32/
 /test/delphi_XE6/lz4d_test.res
 /test/delphi_XE7/lz4d_test.dproj.user
 /test/delphi_XE7/lz4d_test.res
+/test/delphi_XE8/lz4d_test.dproj.user
+/test/delphi_XE8/lz4d_test.res
+/test/delphi_XE8/lz4d_test.stat
