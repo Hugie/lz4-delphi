@@ -17,7 +17,8 @@ Contributed binaries are build using MinGW 4.8.1. and the original sourcecode by
 Compability
 ===========
 
-Tested with RadStudio XE3.
+Tested with RadStudio/Delphi XE2-XE8, 10.0-10.4, 11 and 12.
+Does not work with older versions due to the object files not being compatible with the older linkers.
 
 Currently Win32 lib files only.
 
