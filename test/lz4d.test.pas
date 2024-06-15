@@ -295,9 +295,11 @@ var
   LSource:  TMemoryStream;
   LTarget:  TMemoryStream;
   LResult : TTestResult;
-  LCounter: Integer;
+//  LCounter: Integer;
   LInSize: Int64;
+{$IFDEF WriteOutResults}
   LOutFile: TFileStream;
+{$ENDIF}
 begin
   try
     LTarget      := TMemoryStream.Create();
