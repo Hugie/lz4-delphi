@@ -55,3 +55,4 @@ lz4d_test.res
 Win32/
 test/
 *.mes
+/lz4d_test.stat
