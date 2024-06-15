@@ -51,6 +51,10 @@ uses
   lz4d.lz4,
   lz4d.lz4s;
 
+///<summary>
+/// evaluates command line and runs the tests </summary>
+procedure Main;
+
 procedure lz4dtest( AMemStream: TMemoryStream);
 
 implementation
@@ -480,6 +484,60 @@ begin
   //cleanup
   LSource.Free;
   LTarget.Free;
+end;
+
+procedure Main;
+var
+  LFileStream: TFileStream;
+  LMemStream: TMemoryStream;
+  LDummy: string;
+begin
+  //preperations
+  // - we want 16byte block alignement
+  SetMinimumBlockAlignment(mba16Byte);
+
+  Writeln('LZ4 Delphi Binding Library Test');
+
+  if (System.ParamCount < 1) then
+  begin
+    Writeln('Source file needed for test.');
+    writeln('Usage: pmLZ4Test.exe testfile');
+    Exit();
+  end;
+
+  if not FileExists(System.ParamStr(1)) then
+  begin
+    Writeln('File not found. Please use valid test file.');
+    Exit();
+  end;
+
+  //file access via stream
+  try
+    try
+      //create file stream of test data
+      LFileStream := TFileStream.Create(System.ParamStr(1), fmOpenRead);
+
+      //read data into memory
+      LMemStream  := TMemoryStream.Create();
+      LMemStream.CopyFrom( LFileStream, 0 );
+
+      LFileStream.Free;
+
+      //work the memory
+      lz4dtest( LMemStream );
+
+      //cleanup
+      LMemStream.Free;
+    except
+      on E: Exception do
+        Writeln('Exception on testing: ' + E.ToString());
+    end;
+  finally
+
+  end;
+
+  System.Writeln(' Press Return to Exit ');
+  System.Readln(LDummy);
 end;
 
 end.
