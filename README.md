@@ -1,26 +1,23 @@
 lz4-delphi
 ==========
 
-Delphi bindings for [lz4](https://code.google.com/p/lz4/).
+Delphi bindings for [lz4](https://github.com/lz4/lz4).
 
 Includes easy-to-use wrapper class and an default mode implementation of the new [lz4s streaming format](http://fastcompression.blogspot.fr/2013/04/lz4-streaming-format-final.html).
 
 A Binding for xxHash is also present, since it is necessary for lz4s;
 
-Lz4 Version [r119](https://code.google.com/p/lz4/source/detail?r=119);
+Lz4 Version [1.10.0](https://github.com/lz4/lz4/releases/tag/v1.10.0);
 
 Object Files
 ==========
 
-Contributed binaries are build using MinGW 4.8.1. and the original sourcecode by Yann Collet: [lz4](https://code.google.com/p/lz4/) and [xxHash](https://code.google.com/p/xxhash/).
+Contributed binaries are build using BCC 11.2.
 
 Compability
 ===========
 
-Tested with RadStudio/Delphi XE2-XE8, 10.0-10.4, 11 and 12.
-Does not work with older versions due to the object files not being compatible with the older linkers.
-
-Currently Win32 lib files only.
+Tested with RadStudio/Delphi 7, XE2-XE8, 10.0-10.4, 11 and 12.
 
 Licence
 ==========
