@@ -37,18 +37,17 @@ unit lz4d.test;
 {.$Define WithSynLZTest}
 
 // - write out temp results to files, to be compare and tesable with external Lz4 tools
-{.$Define WriteOutResults}
+{$Define WriteOutResults}
 
 interface
 
 uses
-  System.Classes,
-  System.Diagnostics,
+  Classes,
   {$IFDEF WithSynLZTest}
   SynLZ,
   {$ENDIF}
-  lz4d,
   lz4d.lz4,
+  lz4d,
   lz4d.lz4s;
 
 ///<summary>
@@ -60,11 +59,15 @@ procedure lz4dtest( AMemStream: TMemoryStream);
 implementation
 
 uses
-  System.Math,
-  System.SysUtils;
+  Windows,
+  Math,
+  SysUtils;
 
 const
   CIterCount = 6;
+
+var
+  QPFreq_ : Int64;
 
 //test data
 type
@@ -138,19 +141,37 @@ begin
   end;
 end;
 
+function GetQueryPerformanceCounter: Int64;
+begin
+  QueryPerformanceCounter( result );
+end;
+
+//function GetQueryPerformanceDifference( Counter1 : Int64; Counter2 : Int64 ): Extended;
+//begin
+//  result := (Counter2-Counter1) / QPFreq_ * 1000;
+//end;
+
+function GetQueryPerformanceDifference( Counter1 : Int64; Counter2 : Int64 ): Integer;
+begin
+  result := Round( (Counter2-Counter1) / QPFreq_ * 1000 );
+end;
+
 ////////// * test functions * ///////////////
 
 {$IFDEF WithSynLZTest}
 
 procedure Test_SynLZ_Encode( AInPtr, AOutPtr: PByte; AInSize, AOutSize: Int64; var ATestData: TTestResult);
 var
-  LTimer: TStopwatch;
+  LTimer: Int64;
 begin
   try
-    LTimer := TStopwatch.StartNew();
+    LTimer := GetQueryPerformanceCounter;
     ATestData.SizeRaw   := AInSize;
     ATestData.SizeEnc   := SynLZcompress1asm( PAnsiChar(AInPtr), AOutSize, PAnsiChar(AOutPtr) );
-    ATestData.TimeEncMs := Min(LTimer.ElapsedMilliseconds, ATestData.TimeEncMs);
+
+
+
+    ATestData.TimeEncMs := Min(GetQueryPerformanceDifference( LTimer, GetQueryPerformanceCounter ), ATestData.TimeEncMs);
   except
     on E: Exception do
       Writeln(E.ClassName, ': ', E.Message);
@@ -159,13 +180,13 @@ end;
 
 procedure Test_SynLZ_Decode( AInPtr, AOutPtr: PByte; AInSize, AOutSize: Int64; var ATestData: TTestResult);
 var
-  LTimer: TStopwatch;
+  LTimer: Int64;
 begin
   try
-    LTimer := TStopwatch.StartNew();
+    LTimer := GetQueryPerformanceCounter;
     ATestData.SizeRaw   := SynLZdecompress1asm( PAnsiChar(AInPtr), AInSize, PAnsiChar(AOutPtr));
     ATestData.SizeEnc   := AInSize;
-    ATestData.TimeDecMs := Min(LTimer.ElapsedMilliseconds, ATestData.TimeDecMs);
+    ATestData.TimeDecMs := Min(GetQueryPerformanceDifference( LTimer, GetQueryPerformanceCounter ), ATestData.TimeDecMs);
   except
     on E: Exception do
       Writeln(E.ClassName, ': ', E.Message);
@@ -177,13 +198,13 @@ end;
 
 procedure Test_lz4_Encode( AInPtr, AOutPtr: PByte; AInSize, AOutSize: Int64; var ATestData: TTestResult);
 var
-  LTimer: TStopwatch;
+  LTimer: Int64;
 begin
   try
-    LTimer := TStopwatch.StartNew();
+    LTimer := GetQueryPerformanceCounter;
     ATestData.SizeRaw     := AInSize;
     ATestData.SizeEnc     := TLZ4.Encode( AInPtr, AOutPtr, AInSize, AOutSize );
-    ATestData.TimeEncMs   := Min(LTimer.ElapsedMilliseconds, ATestData.TimeEncMs);
+    ATestData.TimeEncMs   := Min(GetQueryPerformanceDifference( LTimer, GetQueryPerformanceCounter ), ATestData.TimeEncMs);
 
   except
     on E: Exception do
@@ -193,13 +214,13 @@ end;
 
 procedure Test_lz4_Decode( AInPtr, AOutPtr: PByte; AInSize, AOutSize: Int64; var ATestData: TTestResult);
 var
-  LTimer: TStopwatch;
+  LTimer: Int64;
 begin
   try
-    LTimer := TStopwatch.StartNew();
+    LTimer := GetQueryPerformanceCounter;
     ATestData.SizeRaw   := TLZ4.Decode(AInPtr, AOutPtr, AInSize, AOutSize );
     ATestData.SizeEnc   := AInSize;
-    ATestData.TimeDecMs := Min(LTimer.ElapsedMilliseconds, ATestData.TimeDecMs);
+    ATestData.TimeDecMs := Min(GetQueryPerformanceDifference( LTimer, GetQueryPerformanceCounter ), ATestData.TimeDecMs);
   except
     on E: Exception do
       Writeln(E.ClassName, ': ', E.Message);
@@ -209,13 +230,13 @@ end;
 
 procedure Test_lz4s_Encode_Memory( AInPtr, AOutPtr: PByte; AInSize, AOutSize: Int64; var ATestData: TTestResult);
 var
-  LTimer: TStopwatch;
+  LTimer: Int64;
 begin
   try
-    LTimer := TStopwatch.StartNew();
+    LTimer := GetQueryPerformanceCounter;
     ATestData.SizeRaw     := AInSize;
     ATestData.SizeEnc     := TLZ4.Stream_Encode( AInPtr, AOutPtr, AInSize, AOutSize );
-    ATestData.TimeEncMs   := Min(LTimer.ElapsedMilliseconds, ATestData.TimeEncMs);
+    ATestData.TimeEncMs   := Min(GetQueryPerformanceDifference( LTimer, GetQueryPerformanceCounter ), ATestData.TimeEncMs);
 
   except
     on E: Exception do
@@ -225,13 +246,13 @@ end;
 
 procedure Test_lz4s_Encode_Memory_NoCheck( AInPtr, AOutPtr: PByte; AInSize, AOutSize: Int64; var ATestData: TTestResult);
 var
-  LTimer: TStopwatch;
+  LTimer: Int64;
 begin
   try
-    LTimer := TStopwatch.StartNew();
+    LTimer := GetQueryPerformanceCounter;
     ATestData.SizeRaw     := AInSize;
     ATestData.SizeEnc     := TLZ4.Stream_Encode( AInPtr, AOutPtr, AInSize, AOutSize, sbs4MB, False );
-    ATestData.TimeEncMs   := Min(LTimer.ElapsedMilliseconds, ATestData.TimeEncMs);
+    ATestData.TimeEncMs   := Min(GetQueryPerformanceDifference( LTimer, GetQueryPerformanceCounter ), ATestData.TimeEncMs);
 
   except
     on E: Exception do
@@ -241,52 +262,52 @@ end;
 
 procedure Test_lz4s_Encode_Stream( ASourceStream, ATargetStream: TStream; var ATestData: TTestResult);
 var
-  LTimer: TStopwatch;
+  LTimer: Int64;
 begin
   ASourceStream.Position := 0;
   ATargetStream.Position := 0;
 
-  LTimer := TStopwatch.StartNew();
+  LTimer := GetQueryPerformanceCounter;
   ATestData.SizeRaw   := ASourceStream.Size;
   ATestData.SizeEnc   := TLZ4.Stream_Encode( ASourceStream, ATargetStream );
-  ATestData.TimeEncMs := Min(LTimer.ElapsedMilliseconds, ATestData.TimeEncMs);
+  ATestData.TimeEncMs := Min(GetQueryPerformanceDifference( LTimer, GetQueryPerformanceCounter ), ATestData.TimeEncMs);
 end;
 
 procedure Test_lz4s_Encode_Stream_NoCheck( ASourceStream, ATargetStream: TStream; var ATestData: TTestResult);
 var
-  LTimer: TStopwatch;
+  LTimer: Int64;
 begin
   ASourceStream.Position := 0;
   ATargetStream.Position := 0;
 
-  LTimer := TStopwatch.StartNew();
+  LTimer := GetQueryPerformanceCounter;
   ATestData.SizeRaw   := ASourceStream.Size;
   ATestData.SizeEnc   := TLZ4.Stream_Encode( ASourceStream, ATargetStream, sbs4MB, False );
-  ATestData.TimeEncMs := Min(LTimer.ElapsedMilliseconds, ATestData.TimeEncMs);
+  ATestData.TimeEncMs := Min(GetQueryPerformanceDifference( LTimer, GetQueryPerformanceCounter ), ATestData.TimeEncMs);
 end;
 
 procedure Test_lz4s_Decode_Stream( ASourceStream, ATargetStream: TStream; var ATestData: TTestResult);
 var
-  LTimer: TStopwatch;
+  LTimer: Int64;
 begin
   ASourceStream.Position := 0;
   ATargetStream.Position := 0;
 
-  LTimer := TStopwatch.StartNew();
+  LTimer := GetQueryPerformanceCounter;
   ATestData.SizeRaw    := TLZ4.Stream_Decode( ASourceStream, ATargetStream );
   //ATestData.SizeEnc    := ASourceStream.Size; we can not see how large the input data is, Source is always max size - keep previous data
-  ATestData.TimeDecMs  := LTimer.ElapsedMilliseconds;
+  ATestData.TimeDecMs  := GetQueryPerformanceDifference( LTimer, GetQueryPerformanceCounter );
 end;
 
 procedure Test_lz4s_Decode_Memory( AInPtr, AOutPtr: PByte; AInSize, AOutSize: Int64; var ATestData: TTestResult);
 var
-  LTimer: TStopwatch;
+  LTimer: Int64;
 begin
   try
-    LTimer := TStopwatch.StartNew();
+    LTimer := GetQueryPerformanceCounter;
     ATestData.SizeRaw     := TLZ4.Stream_Decode( AInPtr, AOutPtr, AInSize, AOutSize );
     ATestData.SizeEnc     := AInSize;
-    ATestData.TimeDecMs := Min(LTimer.ElapsedMilliseconds, ATestData.TimeDecMs);
+    ATestData.TimeDecMs := Min(GetQueryPerformanceDifference( LTimer, GetQueryPerformanceCounter ), ATestData.TimeDecMs);
 
   except
     on E: Exception do
@@ -307,15 +328,21 @@ var
 begin
   try
     LTarget      := TMemoryStream.Create();
-    LTarget.Size := LZ4_compressBound( AMemStream.Size );
+//    LTarget.Size := {$IFNDEF UNDERSCORE}LZ4_compressBound{$ELSE}_LZ4_compressBound{$ENDIF}( AMemStream.Size );
+    LTarget.Size := TLZ4.CompressionBound( AMemStream.Size );
 
     LSource      := TMemoryStream.Create();
     LSource.CopyFrom( AMemStream, 0 );
   except
     on E:Exception do
     begin
+      {$IFDEF UNICODE}
       Writeln('Could not create destination memory: ' + E.ToString());
-      Exit();
+      {$ELSE}
+      Writeln('Could not create destination memory: ' + E.Message);
+      {$ENDIF}
+
+      Exit;
     end;
   end;
 
@@ -494,28 +521,33 @@ var
 begin
   //preperations
   // - we want 16byte block alignement
+  {$IFDEF UNICODE}
   SetMinimumBlockAlignment(mba16Byte);
+  {$ENDIF}
 
   Writeln('LZ4 Delphi Binding Library Test');
 
   if (System.ParamCount < 1) then
-  begin
-    Writeln('Source file needed for test.');
-    writeln('Usage: pmLZ4Test.exe testfile');
-    Exit();
-  end;
+    begin
+    LDummy := ParamStr( 0 ) + '_';
+//    Writeln('Source file needed for test.');
+//    writeln('Usage: pmLZ4Test.exe testfile');
+//    Exit();
+    end
+  else
+    LDummy := System.ParamStr(1);
 
-  if not FileExists(System.ParamStr(1)) then
+  if not FileExists(LDummy) then
   begin
     Writeln('File not found. Please use valid test file.');
-    Exit();
+    Exit;
   end;
 
   //file access via stream
   try
     try
       //create file stream of test data
-      LFileStream := TFileStream.Create(System.ParamStr(1), fmOpenRead);
+      LFileStream := TFileStream.Create(LDummy, fmOpenRead);
 
       //read data into memory
       LMemStream  := TMemoryStream.Create();
@@ -530,7 +562,11 @@ begin
       LMemStream.Free;
     except
       on E: Exception do
+        {$IFDEF UNICODE}
         Writeln('Exception on testing: ' + E.ToString());
+        {$ELSE}
+        Writeln('Exception on testing: ' + E.Message);
+        {$ENDIF}
     end;
   finally
 
@@ -539,5 +575,8 @@ begin
   System.Writeln(' Press Return to Exit ');
   System.Readln(LDummy);
 end;
+
+initialization
+  QueryPerformanceFrequency( QPFreq_ );
 
 end.

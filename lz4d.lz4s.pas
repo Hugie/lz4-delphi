@@ -41,12 +41,12 @@ This is a temporary implementation of the lz4s library until Yann Collet will pr
 
 interface
 
+{$I LZ4.inc}
+
+{$WARN UNSAFE_TYPE OFF}
 
 const MAGICNUMBER_SIZE    = 4;
 const LZ4S_MAGICNUMBER    = $184D2204;
-const LZ4S_SKIPPABLE0     = $184D2A50;
-const LZ4S_SKIPPABLEMASK  = $FFFFFFF0;
-const LEGACY_MAGICNUMBER  = $184C2102;
 
 const LZ4S_BLOCKSIZEID_DEFAULT  = 7;
 const LZ4S_CHECKSUM_SEED        = 0;
@@ -74,9 +74,6 @@ type
  const CLZ4S_Dec_Depend         = (Byte(fVersion) or Byte(fStreamChecksum));
  const CLZ4S_Dec_Dep_NoChecksum = (Byte(fVersion));
 
- const CLZ4SEncFlags = [CLZ4S_Enc_Default, CLZ4S_Enc_NoChecksum];
- const CLZ4SDecFlags = [CLZ4S_Enc_Default, CLZ4S_Enc_NoChecksum, CLZ4S_Dec_Depend, CLZ4S_Dec_Dep_NoChecksum];
-
 type
   TLZ4BlockSize = (
     bs_4                  = $40, // 01000000 b, 64  KB
@@ -86,7 +83,7 @@ type
   );
 
 type
-  TLZ4StreamDescriptor = packed record
+  TLZ4StreamDescriptor = {$IFDEF UNICODE}packed record{$ELSE}object{$ENDIF}
     Flags:          Byte;
     BlockMaxSize:   Byte;
     StreamSize:     UInt64;   //not used
@@ -94,7 +91,7 @@ type
     HeaderChecksum: Byte;     //not used
     StreamData:     Pointer;  //lz4 Create Stream Result
     ChecksumState:  Pointer;  //XXH32 Stream Checksum State
-    function UsesStreamChecksum(): Boolean; inline;
+    function UsesStreamChecksum(): Boolean; {$IF CompilerVersion >= 23}inline;{$IFEND}
   end;
 
 
@@ -171,22 +168,20 @@ function  lz4s_Decode_Stream_Footer(    var    AStreamDescriptor:         TLZ4St
 //block size is input data size
 // - read this amount of data for each encoding step
 // - expect this amount of data as max output from each decoding step
-function lz4s_size_block_max(  ABlocksize: TLZ4BlockSize ): Cardinal; inline;
+function lz4s_size_block_max(  ABlocksize: TLZ4BlockSize ): Cardinal; {$IF CompilerVersion >= 23}inline;{$IFEND}
 
 //stream block size is output data size
 // - returns the max size of possible output data for each encoding step
 // - read this amount of data as max input size for the decoding step
-function lz4s_size_stream_block_max( ABlocksize: TLZ4BlockSize ): Cardinal;  inline;
-
-
+function lz4s_size_stream_block_max( ABlocksize: TLZ4BlockSize ): Cardinal; {$IF CompilerVersion >= 23}inline;{$IFEND}
 
 implementation
 
-  uses
-    System.SysUtils,
-    System.Math,
-    lz4d.lz4,
-    xxHash;
+uses
+  SysUtils,
+  Math,
+  lz4d.lz4,
+  xxHash;
 
 function lz4s_size_block_max(  ABlocksize: TLZ4BlockSize ): Cardinal;
 begin
@@ -205,6 +200,9 @@ end;
 
 /// Make sure only the supported settings are used
 function CheckSettings( const AFlags, ABlockSize: Byte; var VError: String; AEncoding: Boolean ): Boolean;
+const
+  CLZ4SEncFlags = [CLZ4S_Enc_Default, CLZ4S_Enc_NoChecksum];
+  CLZ4SDecFlags = CLZ4SEncFlags + [CLZ4S_Dec_Depend, CLZ4S_Dec_Dep_NoChecksum];
 begin
   VError := '';
   Result := True;
@@ -232,9 +230,12 @@ begin
 
   Result.Flags          := AFlags;
   Result.BlockMaxSize   := ABlockSize;
+  {$IF CompilerVersion <= 20}{$RANGECHECKS OFF}{$IFEND} // RangeCheck might cause Internal-Error C1118
   Result.StreamSize     := 0;
+  {$IF CompilerVersion <= 20}{$RANGECHECKS ON}{$IFEND} // RangeCheck might cause Internal-Error C1118
   Result.HeaderChecksum := 0;
-  Result.StreamData     := LZ4_createStream();
+  Result.StreamData     := {$IFNDEF UNDERSCORE}LZ4_createStream{$ELSE}_LZ4_createStream{$ENDIF};
+  Result.ChecksumState  := nil;
 
   if (Result.StreamData = nil) then
     raise Exception.Create('LZ4S: Could not create Stream data. LZ4_createStream failed');
@@ -244,7 +245,10 @@ end;
 procedure lz4s_FreeDescriptor( var AStreamDescriptor: TLZ4StreamDescriptor );
 begin
   if (AStreamDescriptor.StreamData <> nil) then
-    LZ4_free( AStreamDescriptor.StreamData );
+    {$IFNDEF UNDERSCORE}LZ4_freeStream{$ELSE}_LZ4_freeStream{$ENDIF}( AStreamDescriptor.StreamData );
+
+  if (AStreamDescriptor.ChecksumState <> nil) then
+    {$IFNDEF UNDERSCORE}XXH32_freeState{$ELSE}_XXH32_freeState{$ENDIF}( AStreamDescriptor.ChecksumState );
 
   FillChar( AStreamDescriptor, SizeOf(TLZ4StreamDescriptor), 0 );
 end;
@@ -268,30 +272,74 @@ begin
   L4BytePtr^  :=  LZ4S_MAGICNUMBER;
 
   //followed by 1 byte flags
-  L1BytePtr   :=  ATargetPtr;
-  L1BytePtr[4]:=  AStreamDescriptor.Flags;
-  L1BytePtr[5]:=  AStreamDescriptor.BlockMaxSize;
+  L1BytePtr                            :=  ATargetPtr;
+  PByte( PAnsiChar( L1BytePtr ) + 4 )^ := AStreamDescriptor.Flags; 
+  PByte( PAnsiChar( L1BytePtr ) + 5 )^ := AStreamDescriptor.BlockMaxSize;
 
   //prepare header hash
   // - hash only flags and blocksize
 
   // => since onle line hash is not available at the moment (compiler error) we need to use the 3 line version
-  AStreamDescriptor.ChecksumState := XXH32_init( LZ4S_CHECKSUM_SEED );
-  XXH32_update( AStreamDescriptor.ChecksumState, L1BytePtr+4, 2 );
-  LHash := XXH32_digest( AStreamDescriptor.ChecksumState );
+  {$IFNDEF UNDERSCORE}
+    {$IF Declared( XXH32 )}
+      LHash := XXH32( PAnsiChar( L1BytePtr )+4, 2, LZ4S_CHECKSUM_SEED );
+      if AStreamDescriptor.UsesStreamChecksum then
+        AStreamDescriptor.ChecksumState := XXH32_createState;
+    {$ELSE}
+      {$IF Declared( XXH32_init )}
+      AStreamDescriptor.ChecksumState := XXH32_init( LZ4S_CHECKSUM_SEED );
+      {$ELSE}
+      AStreamDescriptor.ChecksumState := XXH32_createState;
+      XXH32_reset( AStreamDescriptor.ChecksumState, LZ4S_CHECKSUM_SEED );
+      {$IFEND}
+      XXH32_update( AStreamDescriptor.ChecksumState, PAnsiChar( L1BytePtr )+4, 2 );
+      LHash := XXH32_digest( AStreamDescriptor.ChecksumState );
+    {$IFEND}
+  {$ELSE}
+    {$IF Declared( _XXH32 )}
+      LHash := _XXH32( PAnsiChar( L1BytePtr )+4, 2, LZ4S_CHECKSUM_SEED );
+      if AStreamDescriptor.UsesStreamChecksum then
+        AStreamDescriptor.ChecksumState := _XXH32_createState;
+    {$ELSE}
+      {$IF Declared( _XXH32_init )}
+      AStreamDescriptor.ChecksumState := _XXH32_init( LZ4S_CHECKSUM_SEED );
+      {$ELSE}
+      AStreamDescriptor.ChecksumState := _XXH32_createState;
+      _XXH32_reset( AStreamDescriptor.ChecksumState, LZ4S_CHECKSUM_SEED );
+      {$IFEND}
+      _XXH32_update( AStreamDescriptor.ChecksumState, PAnsiChar( L1BytePtr )+4, 2 );
+      LHash := _XXH32_digest( AStreamDescriptor.ChecksumState );
+    {$IFEND}
+  {$ENDIF}
 
   //header gets only the second byte of the 4 byte header hash
-  L1BytePtr[6]:= Byte((LHash shr 8) and $FF);
+  PByte( PAnsiChar( L1BytePtr ) + 6 )^ := Byte((LHash shr 8) and $FF);
 
   //reset checksum state - if used for stream
-  if (AStreamDescriptor.UsesStreamChecksum) then
-    AStreamDescriptor.ChecksumState := XXH32_init(LZ4S_CHECKSUM_SEED );
+  if AStreamDescriptor.UsesStreamChecksum then
+    begin
+    {$IFNDEF UNDERSCORE}
+      {$IF Declared( XXH32_init )}
+        AStreamDescriptor.ChecksumState := XXH32_init( LZ4S_CHECKSUM_SEED );
+      {$ELSE}
+        XXH32_reset( AStreamDescriptor.ChecksumState, LZ4S_CHECKSUM_SEED );
+      {$IFEND}
+    {$ELSE}
+      {$IF Declared( _XXH32_init )}
+        AStreamDescriptor.ChecksumState := _XXH32_init( LZ4S_CHECKSUM_SEED );
+      {$ELSE}
+        _XXH32_reset( AStreamDescriptor.ChecksumState, LZ4S_CHECKSUM_SEED );
+      {$IFEND}
+    {$ENDIF}
+    end;
 
   //we prepared 7 bits to write
   Result := 7;
 
   //start stream size
+  {$IF CompilerVersion <= 20}{$RANGECHECKS OFF}{$IFEND} // RangeCheck might cause Internal-Error C1118
   AStreamDescriptor.StreamSize := 7;
+  {$IF CompilerVersion <= 20}{$RANGECHECKS ON}{$IFEND} // RangeCheck might cause Internal-Error C1118
 end;
 
 function  lz4s_Encode_Continue(
@@ -307,20 +355,21 @@ var
 begin
   Result := 0;
 
-  if (ASourceSize <= 0) then Exit();
+  if (ASourceSize <= 0) then
+    Exit;
 
   if (ATargetSize < ASourceSize+4) then
     raise Exception.Create('LZ4S: Not enough Target memory for max block write length.');
 
   //update hash for next block - if configured
   if (AStreamDescriptor.UsesStreamChecksum) then
-    XXH32_update(AStreamDescriptor.ChecksumState, ASourcePtr, ASourceSize);
+    {$IFNDEF UNDERSCORE}XXH32_update{$ELSE}_XXH32_update{$ENDIF}(AStreamDescriptor.ChecksumState, ASourcePtr, ASourceSize);
 
   //compress next block
   // - first 4 bytes contains the Compressed/Uncompressed Flag + Block size
   // - write compressed data to the follow up bytes
   LBytePtr  := ATargetPtr;
-  LOutBytes := LZ4_compress_continue( AStreamDescriptor.StreamData, ASourcePtr, LBytePtr+4, ASourceSize );
+  LOutBytes := {$IFNDEF UNDERSCORE}LZ4_compress_continue{$ELSE}_LZ4_compress_continue{$ENDIF}( AStreamDescriptor.StreamData, ASourcePtr, PAnsiChar( LBytePtr )+4, ASourceSize );
 
   //<=0 means no compression happend - store it uncompressed
   if (LOutBytes > 0) then
@@ -328,7 +377,9 @@ begin
     //compression successfull
     PCardinal(LBytePtr)^ := LOutBytes and $7FFFFFFF; //highes bit = 0 = compressed
     //inc stream size
+    {$IF CompilerVersion <= 20}{$RANGECHECKS OFF}{$IFEND} // RangeCheck might cause Internal-Error C1118
     AStreamDescriptor.StreamSize := LOutBytes + AStreamDescriptor.StreamSize;
+    {$IF CompilerVersion <= 20}{$RANGECHECKS ON}{$IFEND} // RangeCheck might cause Internal-Error C1118
     //byte written
     Result := LOutBytes + 4;
   end else
@@ -336,7 +387,9 @@ begin
     //compression unsuccessfull
     PCardinal(LBytePtr)^ := ASourceSize or $80000000;  //highest bit = 1 = uncompressed block
     //inc stream size
+    {$IF CompilerVersion <= 20}{$RANGECHECKS OFF}{$IFEND} // RangeCheck might cause Internal-Error C1118
     AStreamDescriptor.StreamSize := ASourceSize + AStreamDescriptor.StreamSize;
+    {$IF CompilerVersion <= 20}{$RANGECHECKS ON}{$IFEND} // RangeCheck might cause Internal-Error C1118
     //byte written
     Result := ASourceSize + 4;
   end;
@@ -366,7 +419,8 @@ begin
     if (ATargetSize < 8) then
       raise Exception.Create('LZ4S: Not enough Target memory for stream footer.');
 
-    L4BytePtr^ := XXH32_digest( AStreamDescriptor.ChecksumState );
+    L4BytePtr^ := {$IFNDEF UNDERSCORE}XXH32_digest{$ELSE}_XXH32_digest{$ENDIF}( AStreamDescriptor.ChecksumState );
+
     Result := 8;
   end;
 end;
@@ -376,8 +430,23 @@ function  lz4s_Decode_CreateDescriptor(): TLZ4StreamDescriptor;
 begin
   //init necessary structures
   FillChar( Result, sizeof(TLZ4StreamDescriptor), 0 );
-  Result.StreamData     := LZ4_createStreamDecode;
-  Result.ChecksumState  := XXH32_init( LZ4S_CHECKSUM_SEED );
+  Result.StreamData     := {$IFNDEF UNDERSCORE}LZ4_createStreamDecode{$ELSE}_LZ4_createStreamDecode{$ENDIF};
+
+  {$IFNDEF UNDERSCORE}
+    {$IF Declared( XXH32_init )}
+      Result.ChecksumState  := XXH32_init( LZ4S_CHECKSUM_SEED );
+    {$ELSE}
+      Result.ChecksumState := XXH32_createState;
+      XXH32_reset( Result.ChecksumState, LZ4S_CHECKSUM_SEED );
+    {$IFEND}
+  {$ELSE}
+    {$IF Declared( _XXH32_init )}
+      Result.ChecksumState  := _XXH32_init( LZ4S_CHECKSUM_SEED );
+    {$ELSE}
+      Result.ChecksumState := _XXH32_createState;
+      _XXH32_reset( Result.ChecksumState, LZ4S_CHECKSUM_SEED );
+    {$IFEND}
+  {$ENDIF}
 end;
 
 
@@ -401,13 +470,26 @@ begin
   if (LMagicNumber <> LZ4S_MAGICNUMBER ) then
     raise Exception.Create('LZ4S: Unsupported or unrecognized file format. Only default lz4s format is supported.');
 
-  AStreamDescriptor.Flags           := (ASourcePtr+4)^;
-  AStreamDescriptor.BlockMaxSize    := (ASourcePtr+5)^;
-  AStreamDescriptor.HeaderChecksum  := (ASourcePtr+6)^;
+  AStreamDescriptor.Flags           := PByte( PAnsiChar( ASourcePtr )+4 )^;
+  AStreamDescriptor.BlockMaxSize    := PByte( PAnsiChar( ASourcePtr )+5 )^;
+  AStreamDescriptor.HeaderChecksum  := PByte( PAnsiChar( ASourcePtr )+6 )^;
 
   // => since onle line hash is not available at the moment (compiler error) we need to use the 3 line version
-  XXH32_update( AStreamDescriptor.ChecksumState, (ASourcePtr+4), 2 );
-  LHash := XXH32_digest( AStreamDescriptor.ChecksumState );
+  {$IFNDEF UNDERSCORE}
+    {$IF Declared( XXH32 )}
+      LHash := XXH32( PAnsiChar( ASourcePtr )+4, 2, LZ4S_CHECKSUM_SEED );
+    {$ELSE}
+      XXH32_update( AStreamDescriptor.ChecksumState, PAnsiChar( ASourcePtr )+4, 2 );
+      LHash := XXH32_digest( AStreamDescriptor.ChecksumState );
+    {$IFEND}
+  {$ELSE}
+    {$IF Declared( _XXH32 )}
+      LHash := _XXH32( PAnsiChar( ASourcePtr )+4, 2, LZ4S_CHECKSUM_SEED );
+    {$ELSE}
+      _XXH32_update( AStreamDescriptor.ChecksumState, PAnsiChar( ASourcePtr )+4, 2 );
+      LHash := _XXH32_digest( AStreamDescriptor.ChecksumState );
+    {$IFEND}
+  {$ENDIF}
 
   //header gets only the second byte of the 4 byte header hash
   LHash:= Byte((LHash shr 8) and $FF);
@@ -420,9 +502,25 @@ begin
   if not CheckSettings( AStreamDescriptor.Flags, AStreamDescriptor.BlockMaxSize, LError, False) then
     raise Exception.Create('LZ4S: Invalid stream header: ' + LError);
 
-    //reinit XXH32 stuff - if necessary
-  if (AStreamDescriptor.UsesStreamChecksum) then
-    AStreamDescriptor.ChecksumState  := XXH32_init( LZ4S_CHECKSUM_SEED );
+  //reinit XXH32 stuff - if necessary
+  {$IF NOT Declared( XXH32 ) AND NOT Declared( _XXH32 )}
+  if AStreamDescriptor.UsesStreamChecksum then
+    begin
+    {$IFNDEF UNDERSCORE}
+      {$IF Declared( XXH32_init )}
+        AStreamDescriptor.ChecksumState := XXH32_init( LZ4S_CHECKSUM_SEED );
+      {$ELSE}
+        XXH32_reset( AStreamDescriptor.ChecksumState, LZ4S_CHECKSUM_SEED );
+      {$IFEND}
+    {$ELSE}
+      {$IF Declared( _XXH32_init )}
+        AStreamDescriptor.ChecksumState := _XXH32_init( LZ4S_CHECKSUM_SEED );
+      {$ELSE}
+        _XXH32_reset( AStreamDescriptor.ChecksumState, LZ4S_CHECKSUM_SEED );
+      {$IFEND}
+    {$ENDIF}
+    end;
+  {$IFEND}
 
   Result := 7;
 end;
@@ -441,14 +539,15 @@ begin
   Result := True;
 
   //if no stream checksums are given, ignore the footer
-  if (not AStreamDescriptor.UsesStreamChecksum) then Exit();
+  if (not AStreamDescriptor.UsesStreamChecksum) then
+    Exit;
 
   if (ASourceSize < 4)  then
     raise Exception.Create('LZ4S: Decoding Data too small for default footer informations.');
 
   Move( ASourcePtr^, LStreamHash, 4 );
 
-  LHash := XXH32_digest( AStreamDescriptor.ChecksumState );
+  LHash := {$IFNDEF UNDERSCORE}XXH32_digest{$ELSE}_XXH32_digest{$ENDIF}( AStreamDescriptor.ChecksumState );
 
   if (LStreamHash <> LHash) then
     raise Exception.Create('LZ4S: Stream Data is corrupt. Stream and result hash differs.');
@@ -489,8 +588,8 @@ begin
   //check for EOS
   if (LBlockSize = LZ4S_EOS) then
   begin
-    Result          := 0;
-    Exit();
+    Result := 0;
+    Exit;
   end;
 
   //highest bit = 0 => uncompressed block
@@ -504,18 +603,18 @@ begin
   if (LCompressed) then
   begin
     // * compressed block * //
-    LDecompBytes := LZ4_decompress_safe_continue( AStreamDescriptor.StreamData, (ASourcePtr+4), ATargetPtr, LBlockSize, ATargetSize );
+    LDecompBytes := {$IFNDEF UNDERSCORE}LZ4_decompress_safe_continue{$ELSE}_LZ4_decompress_safe_continue{$ENDIF}( AStreamDescriptor.StreamData, PAnsiChar( ASourcePtr )+4, ATargetPtr, LBlockSize, ATargetSize );
     Result := LDecompBytes;
   end
   else
   begin
     Result := LBlockSize;
-    Move( (ASourcePtr+4)^, ATargetPtr^, LBlockSize );
+    Move( ( PAnsiChar( ASourcePtr )+4 )^, ATargetPtr^, LBlockSize );
   end;
 
   //finaly, update hash of decompressed material
   if (AStreamDescriptor.UsesStreamChecksum) then
-    XXH32_update( AStreamDescriptor.ChecksumState, ATargetPtr, Result );
+    {$IFNDEF UNDERSCORE}XXH32_update{$ELSE}_XXH32_update{$ENDIF}( AStreamDescriptor.ChecksumState, ATargetPtr, Result );
 end;
 
 { TLZ4StreamDescriptor }

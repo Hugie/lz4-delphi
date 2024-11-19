@@ -44,18 +44,29 @@ unit lz4d;
 
 interface
 
-uses
-  System.Classes;
+{$I LZ4.inc}
 
+{$WARN UNSAFE_CODE OFF}
+{$WARN UNSAFE_TYPE OFF}
+
+uses
+  Classes;
 
 type
+  {$IFNDEF UNICODE}
+  /// Stream block size is the data chunk size used for each compression step/block
+  ///  User friendly version
+  TStreamBlockSize = ( sbs64K, sbs256K, sbs1MB, sbs4MB );
+  {$ENDIF}
+
   //Wrapped functions for easier usage
   TLZ4 = class
   public
+    {$IFDEF UNICODE}
     /// Stream block size is the data chunk size used for each compression step/block
     ///  User friendly version
     type TStreamBlockSize = ( sbs64K, sbs256K, sbs1MB, sbs4MB );
-
+    {$ENDIF}
 
     /// * memory function * ///
     ///  - data needs to be given in full as memory pointer
@@ -63,7 +74,6 @@ type
     //calculate the maximum worst case output size, if the data is not compressible
     // - maximum of $7FFFFFFF Bytes should not be exceeded - returns 0 on that case
     class function CompressionBound( const ASourceSize: Int64 ): Int64;
-
 
     //classic raw encoding function
     // - returns encoded byte size
@@ -101,7 +111,7 @@ type
 implementation
 
 uses
-  System.SysUtils,
+  SysUtils,
   lz4d.lz4,
   lz4d.lz4s,
   xxHash;
@@ -117,7 +127,7 @@ const
 
 class function TLZ4.CompressionBound(const ASourceSize: Int64): Int64;
 begin
-  Result := LZ4_compressBound( ASourceSize );
+  Result := {$IFNDEF UNDERSCORE}LZ4_compressBound{$ELSE}_LZ4_compressBound{$ENDIF}( ASourceSize );
 end;
 
 class function TLZ4.Encode(
@@ -127,7 +137,7 @@ class function TLZ4.Encode(
         ATargetSize:  Int64)
   : Int64;
 begin
-  Result := LZ4_compress( ASourcePtr, ATargetPtr, ASourceSize );
+  Result := {$IFNDEF UNDERSCORE}LZ4_compress_default{$ELSE}_LZ4_compress_default{$ENDIF}( ASourcePtr, ATargetPtr, ASourceSize, ATargetSize );
 end;
 
 class function TLZ4.Decode(
@@ -139,10 +149,10 @@ class function TLZ4.Decode(
 //var
 //  LResult: Integer;
 begin
-  Result  := LZ4_decompress_safe( ASourcePtr, ATargetPtr, ASourceSize, ATargetSize );
+  Result  := {$IFNDEF UNDERSCORE}LZ4_decompress_safe{$ELSE}_LZ4_decompress_safe{$ENDIF}( ASourcePtr, ATargetPtr, ASourceSize, ATargetSize );
 
 // decompress_fast returns the amount of READ bytes - not the output size
-//  LResult := LZ4_decompress_fast( ASourcePtr, ATargetPtr, ATargetSize );
+//  LResult := {$IFNDEF UNDERSCORE}LZ4_decompress_fast{$ELSE}_LZ4_decompress_fast{$ENDIF}( ASourcePtr, ATargetPtr, ATargetSize );
 //  Result  := ATargetSize;
 end;
 
@@ -177,11 +187,11 @@ begin
 
   //map block size
   case ABlockSize of
-    sbs64K:   LBlockID := TLZ4BlockSize.bs_4;
-    sbs256K:  LBlockID := TLZ4BlockSize.bs_5;
-    sbs1MB:   LBlockID := TLZ4BlockSize.bs_6;
-    sbs4MB:   LBlockID := TLZ4BlockSize.bs_7;
-    else      LBlockID := TLZ4BlockSize.bs_7;
+    sbs64K:   LBlockID := {$IFDEF UNICODE}TLZ4BlockSize.{$ENDIF}bs_4;
+    sbs256K:  LBlockID := {$IFDEF UNICODE}TLZ4BlockSize.{$ENDIF}bs_5;
+    sbs1MB:   LBlockID := {$IFDEF UNICODE}TLZ4BlockSize.{$ENDIF}bs_6;
+    sbs4MB:   LBlockID := {$IFDEF UNICODE}TLZ4BlockSize.{$ENDIF}bs_7;
+    else      LBlockID := {$IFDEF UNICODE}TLZ4BlockSize.{$ENDIF}bs_7;
   end;
 
   LChunk := nil;
@@ -236,7 +246,7 @@ begin
       Inc(Result, LBytes);
 
       //save dictionary - and store location pointer of dict inside stream struct
-      LZ4_saveDict( LSD.StreamData, LDict, CDictSize);
+      {$IFNDEF UNDERSCORE}LZ4_saveDict{$ELSE}_LZ4_saveDict{$ENDIF}( LSD.StreamData, LDict, CDictSize);
     end;
 
     //write footer
@@ -267,7 +277,7 @@ var
   //bytes available for writing
   LBytes:       Integer;
   //buffer for encoded source data
-  LBuffer:      PByte;
+  LBuffer:      {$IFDEF UNICODE}PByte{$ELSE}PAnsiChar{$ENDIF};
   LBufferSize:  Cardinal;
   //decoded data
   LBlock:       PByte;
@@ -305,7 +315,7 @@ begin
     //allocate source data buffer
     GetMem( LBuffer, LBufferSize + LBlockSize );
     //seperate decoded data block
-    LBlock        := (LBuffer + LBufferSize);
+    LBlock        := PByte(LBuffer + LBufferSize);
 
     //we start with 0 overflow of bytes
     //LOverflow   := 0;
@@ -326,13 +336,13 @@ begin
         raise Exception.Create('LZ4D: corrupt block header! Block data exceeds max stream block size');
 
       //read necessary chunk bytes - available bytes for decoding is chunk+header
-      LBytes := ASourceStream.Read( (LBuffer+CBlockHeader)^, LChunkSize ) + CBlockHeader;
+      LBytes := ASourceStream.Read( PByte( LBuffer+CBlockHeader )^, LChunkSize ) + CBlockHeader;
 
       if (LBytes < (LChunkSize + CBlockHeader)) then
         raise Exception.Create('LZ4D: not enough stream data available to decode block.');
 
       //decode next block
-      LBytes := lz4s_Decode_Block( LSD, LBuffer, LBlock, LBytes, LBlockSize);
+      LBytes := lz4s_Decode_Block( LSD, PByte( LBuffer ), LBlock, LBytes, LBlockSize);
 
       //write data to stream
       ATargetStream.WriteBuffer( LBlock^, LBytes );
@@ -343,7 +353,7 @@ begin
     LBytes := ASourceStream.Read( LBuffer^, CFooterSize );
 
     //check agains stream hash - throws exception if it fails
-    lz4s_Decode_Stream_Footer( LSD, LBuffer, LBytes );
+    lz4s_Decode_Stream_Footer( LSD, PByte( LBuffer ), LBytes );
   finally
     //cleanup
     lz4s_FreeDescriptor( LSD );
@@ -399,10 +409,10 @@ begin
     while (LBytes > 0) and (ASourceSize-LInPos > 0) do
     begin
       //calc chunk data size (block size - block header size)
-      LBytesLeft := lz4s_Decode_Get_Block_Size( LSD, PCardinal(ASource+LInPos), ASourceSize-LInPos );
+      LBytesLeft := lz4s_Decode_Get_Block_Size( LSD, PCardinal( PAnsiChar( ASource )+LInPos), ASourceSize-LInPos );
 
       //decode next block
-      LBytes := lz4s_Decode_Block( LSD, (ASource+LInPos), (ATarget+LOutPos), LBytesLeft+CBlockHeadSize, ATargetSize-LOutPos);
+      LBytes := lz4s_Decode_Block( LSD, PByte( PAnsiChar( ASource )+LInPos ), PByte( PAnsiChar( ATarget )+LOutPos ), LBytesLeft+CBlockHeadSize, ATargetSize-LOutPos);
 
       //update position
       Inc(LInPos,   LBytesLeft+CBlockHeadSize);
@@ -410,7 +420,7 @@ begin
     end;
 
     //read stream footer
-    lz4s_Decode_Stream_Footer( LSD, ASource+LInPos, ASourceSize-LInPos );
+    lz4s_Decode_Stream_Footer( LSD, PByte( PAnsiChar( ASource )+LInPos ), ASourceSize-LInPos );
 
     Result := LOutPos;
   finally
@@ -450,11 +460,11 @@ begin
 
   //map block size
   case ABlockSize of
-    sbs64K:   LBlockID := TLZ4BlockSize.bs_4;
-    sbs256K:  LBlockID := TLZ4BlockSize.bs_5;
-    sbs1MB:   LBlockID := TLZ4BlockSize.bs_6;
-    sbs4MB:   LBlockID := TLZ4BlockSize.bs_7;
-    else      LBlockID := TLZ4BlockSize.bs_7;
+    sbs64K:   LBlockID := {$IFDEF UNICODE}TLZ4BlockSize.{$ENDIF}bs_4;
+    sbs256K:  LBlockID := {$IFDEF UNICODE}TLZ4BlockSize.{$ENDIF}bs_5;
+    sbs1MB:   LBlockID := {$IFDEF UNICODE}TLZ4BlockSize.{$ENDIF}bs_6;
+    sbs4MB:   LBlockID := {$IFDEF UNICODE}TLZ4BlockSize.{$ENDIF}bs_7;
+    else      LBlockID := {$IFDEF UNICODE}TLZ4BlockSize.{$ENDIF}bs_7;
   end;
 
   try
@@ -476,7 +486,7 @@ begin
       LSD := lz4s_Encode_CreateDescriptor( CLZ4S_Enc_NoChecksum, Byte(LBlockID) );
 
     //Try to encode the header
-    LBytes  := lz4s_Encode_Header( LSD, ATarget+LOutPos, LChunkSize );
+    LBytes  := lz4s_Encode_Header( LSD, PByte( PAnsiChar( ATarget )+LOutPos ), LChunkSize );
 
     //write data to stream
     Inc(LOutPos,  LBytes);
@@ -489,7 +499,7 @@ begin
       if (LBytesLeft > LBlockSize) then LBytesLeft := LBlockSize;
 
       //encode next block
-      LBytes := lz4s_Encode_Continue( LSD, ASource+LInPos, ATarget+LOutPos, LBytesLeft, ATargetSize - LOutPos );
+      LBytes := lz4s_Encode_Continue( LSD, PByte( PAnsiChar( ASource )+LInPos ), PByte( PAnsiChar( ATarget )+LOutPos ), LBytesLeft, ATargetSize - LOutPos );
 
       //write data to "stream"
       Inc(LInPos,   LBytesLeft);
@@ -497,7 +507,7 @@ begin
     end;
 
     //write footer
-    LBytes := lz4s_Encode_Footer( LSD, ATarget+LOutPos, LChunkSize );
+    LBytes := lz4s_Encode_Footer( LSD, PByte( PAnsiChar( ATarget )+LOutPos ), LChunkSize );
     Inc(LOutPos,  LBytes);
 
     Result := LOutPos;
