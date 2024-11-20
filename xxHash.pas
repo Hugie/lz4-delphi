@@ -1,193 +1,88 @@
-////////////////// xxHash.h binding file /////////////////////
-/// Version: r34
-/// Author: Hanno Hugenberg
-
-{
-   xxHash - Fast Hash algorithm
-   Header File
-   Copyright (C) 2012-2014, Yann Collet.
-   BSD 2-Clause License (http://www.opensource.org/licenses/bsd-license.php)
-
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions are
-   met:
-
-       * Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-       * Redistributions in binary form must reproduce the above
-   copyright notice, this list of conditions and the following disclaimer
-   in the documentation and/or other materials provided with the
-   distribution.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-   You can contact the author at :
-   - xxHash source repository : http://code.google.com/p/xxhash/
-}
-
-{
-  Notice extracted from xxHash homepage :
-
-  xxHash is an extremely fast Hash algorithm, running at RAM speed limits.
-  It also successfully passes all tests from the SMHasher suite.
-
-  Comparison (single thread, Windows Seven 32 bits, using SMHasher on a Core 2 Duo @3GHz)
-
-  Name            Speed       Q.Score   Author
-  xxHash          5.4 GB/s     10
-  CrapWow         3.2 GB/s      2       Andrew
-  MumurHash 3a    2.7 GB/s     10       Austin Appleby
-  SpookyHash      2.0 GB/s     10       Bob Jenkins
-  SBox            1.4 GB/s      9       Bret Mulvey
-  Lookup3         1.2 GB/s      9       Bob Jenkins
-  SuperFastHash   1.2 GB/s      1       Paul Hsieh
-  CityHash64      1.05 GB/s    10       Pike & Alakuijala
-  FNV             0.55 GB/s     5       Fowler, Noll, Vo
-  CRC32           0.43 GB/s     9
-  MD5-32          0.33 GB/s    10       Ronald L. Rivest
-  SHA1-32         0.28 GB/s    10
-
-  Q.Score is a measure of quality of the hash function.
-  It depends on successfully passing SMHasher test set.
-  10 is a perfect score.
-}
-
 unit xxHash;
-
-{$I lz4d.defines.inc}
 
 interface
 
-// bind necessary object files
+{$WARN UNSAFE_TYPE OFF}
 
-// * MinGW * //
-{$IfDef MinGW_LIB}
-  {$L lib/win32_mingw/xxhash.o}
-{$EndIf}
-
-
-// * Visual Studio * //
-{$IfDef VS_LIB}
-  {$L lib/win32_vs/xxhash.obj}
-{$EndIf}
-
-/// Linking lz4 object files and adding dependencies
-/// - linking the object files produces additional dependencies
-///    which would be usaly provided by the object file linker
-///  - see dependency units for more informations
+{$I LZ4.inc}
 
 uses
-{$IfDef ResolveMissingDependencies}
-  lz4d.dependencies;
-{$Else}
-  ;
-{$Endif}
+  lz4d.Imports;
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+const
+  XXHASH_H_5627135585666179 = 1;
+  XXH_VERSION_MAJOR = 0;
+  XXH_VERSION_MINOR = 6;
+  XXH_VERSION_RELEASE = 5;
+  XXH_VERSION_NUMBER = (XXH_VERSION_MAJOR*100*100+XXH_VERSION_MINOR*100+XXH_VERSION_RELEASE);
 
+{$MINENUMSIZE 4}
+type
+  {$IF NOT Declared( PUInt64 )}
+  PUInt64 = ^UInt64;
+  {$IFEND}
 
-//****************************
-// Type
-//****************************
-type XXH_errorcode = ( XXH_OK=0, XXH_ERROR ) ;
+  XXH_errorcode = (
+    XXH_OK    = 0,
+    XXH_ERROR = 1
+  );
 
-//const XXH32_SIZEOFSTATE = 48;
-//type XXH32_stateSpace_t = packed record (
-//  long long ll[(XXH32_SIZEOFSTATE+(sizeof(long long)-1))/sizeof(long long)];
-//  );
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+function {$IFNDEF UNDERSCORE}XXH_versionNumber{$ELSE}_XXH_versionNumber{$ENDIF}: Cardinal; cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH_versionNumber'{$IFEND};
 
-//****************************
-// Simple Hash Functions
-//****************************
+(*! XXH32() :
+    Calculate the 32-bit hash of sequence "length" bytes stored at memory address "input".
+    The memory between input & input+length must be valid (allocated and read-accessible).
+    "seed" can be used to alter the result predictably.
+    Speed on Core 2 Duo @ 3 GHz (single thread, SMHasher benchmark) : 5.4 GB/s *)
+function {$IFNDEF UNDERSCORE}XXH32{$ELSE}_XXH32{$ENDIF}(const input: Pointer; length: NativeUInt; seed: Cardinal): Cardinal; cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH32'{$IFEND};
 
-//XXH32() :
-//    Calculate the 32-bits hash of sequence of length "len" stored at memory address "input".
-//    The memory between input & input+len must be valid (allocated and read-accessible).
-//    "seed" can be used to alter the result predictably.
-//    This function successfully passes all SMHasher tests.
-//    Speed on Core 2 Duo @ 3 GHz (single thread, SMHasher benchmark) : 5.4 GB/s
-//    Note that "len" is type "int", which means it is limited to 2^31-1.
-//    If your data is larger, use the advanced functions below.
+function {$IFNDEF UNDERSCORE}XXH32_createState{$ELSE}_XXH32_createState{$ENDIF}: Pointer; cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH32_createState'{$IFEND};
 
+function {$IFNDEF UNDERSCORE}XXH32_freeState{$ELSE}_XXH32_freeState{$ENDIF}(statePtr: Pointer): XXH_errorcode; cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH32_freeState'{$IFEND};
 
-//Compiler error:
-// [dcc32 Fehler] xxHash.pas(118): E2065 Ungenügende Forward- oder External-Deklaration: 'XXH32'
+procedure {$IFNDEF UNDERSCORE}XXH32_copyState{$ELSE}_XXH32_copyState{$ENDIF}(dst_state: Pointer; const src_state: Pointer); cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH32_copyState'{$IFEND};
 
-//function XXH32 (const AInput: Pointer; ALength: Integer; ASeed: Cardinal): Cardinal; cdecl; external name '_XXH32';
+function {$IFNDEF UNDERSCORE}XXH32_reset{$ELSE}_XXH32_reset{$ENDIF}(statePtr: Pointer; seed: Cardinal): XXH_errorcode; cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH32_reset'{$IFEND};
 
-//****************************
-// Advanced Hash Functions
-//****************************
+function {$IFNDEF UNDERSCORE}XXH32_update{$ELSE}_XXH32_update{$ENDIF}(statePtr: Pointer; const input: Pointer; length: NativeUInt): XXH_errorcode; cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH32_update'{$IFEND};
 
-//These functions calculate the xxhash of an input provided in several small packets,
-//as opposed to an input provided as a single block.
-//
-//It must be started with :
-//void* XXH32_init()
-//The function returns a pointer which holds the state of calculation.
-//
-//This pointer must be provided as "void* state" parameter for XXH32_update().
-//XXH32_update() can be called as many times as necessary.
-//The user must provide a valid (allocated) input.
-//The function returns an error code, with 0 meaning OK, and any other value meaning there is an error.
-//Note that "len" is type "int", which means it is limited to 2^31-1.
-//If your data is larger, it is recommended to chunk your data into blocks
-//of size for example 2^30 (1GB) to avoid any "int" overflow issue.
-//
-//Finally, you can end the calculation anytime, by using XXH32_digest().
-//This function returns the final 32-bits hash.
-//You must provide the same "void* state" parameter created by XXH32_init().
-//Memory will be freed by XXH32_digest().
+function {$IFNDEF UNDERSCORE}XXH32_digest{$ELSE}_XXH32_digest{$ENDIF}(const statePtr: Pointer): Cardinal; cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH32_digest'{$IFEND};
 
-function XXH32_init   (ASeed: Cardinal): Pointer; cdecl; external name '_XXH32_init';
-function XXH32_update (const AState, AInput: Pointer; ALength: Integer): XXH_errorcode; cdecl; external name '_XXH32_update';
-function XXH32_digest (const AState: Pointer): Cardinal; cdecl; external name '_XXH32_digest';
+procedure {$IFNDEF UNDERSCORE}XXH32_canonicalFromHash{$ELSE}_XXH32_canonicalFromHash{$ENDIF}(dst: PCardinal; hash: Cardinal); cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH32_canonicalFromHash'{$IFEND};
 
+function {$IFNDEF UNDERSCORE}XXH32_hashFromCanonical{$ELSE}_XXH32_hashFromCanonical{$ENDIF}(const src: PCardinal): Cardinal; cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH32_hashFromCanonical'{$IFEND};
 
-//These functions allow user application to make its own allocation for state.
-//
-//XXH32_sizeofState() is used to know how much space must be allocated for the xxHash 32-bits state.
-//Note that the state must be aligned to access 'long long' fields. Memory must be allocated and referenced by a pointer.
-//This pointer must then be provided as 'state' into XXH32_resetState(), which initializes the state.
-//
-//For static allocation purposes (such as allocation on stack, or freestanding systems without malloc()),
-//use the structure XXH32_stateSpace_t, which will ensure that memory space is large enough and correctly aligned to access 'long long' fields.
+(*! XXH64() :
+    Calculate the 64-bit hash of sequence of length "len" stored at memory address "input".
+    "seed" can be used to alter the result predictably.
+    This function runs faster on 64-bit systems, but slower on 32-bit systems (see benchmark).
+ *)
+function {$IFNDEF UNDERSCORE}XXH64{$ELSE}_XXH64{$ENDIF}(const input: Pointer; length: NativeUInt; seed: UInt64): UInt64; cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH64'{$IFEND};
 
-function XXH32_sizeofState(): Integer; cdecl; external name '_XXH32_sizeofState';
-function XXH32_resetState(AState: Pointer; ASeed: Cardinal): XXH_errorcode; cdecl; external name '_XXH32_resetState';
+function {$IFNDEF UNDERSCORE}XXH64_createState{$ELSE}_XXH64_createState{$ENDIF}: Pointer; cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH64_createState'{$IFEND};
 
+function {$IFNDEF UNDERSCORE}XXH64_freeState{$ELSE}_XXH64_freeState{$ENDIF}(statePtr: Pointer): XXH_errorcode; cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH64_freeState'{$IFEND};
 
-//This function does the same as XXH32_digest(), generating a 32-bit hash,
-//but preserve memory context.
-//This way, it becomes possible to generate intermediate hashes, and then continue feeding data with XXH32_update().
-//To free memory context, use XXH32_digest(), or free().
+procedure {$IFNDEF UNDERSCORE}XXH64_copyState{$ELSE}_XXH64_copyState{$ENDIF}(dst_state: Pointer; const src_state: Pointer); cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH64_copyState'{$IFEND};
 
+function {$IFNDEF UNDERSCORE}XXH64_reset{$ELSE}_XXH64_reset{$ENDIF}(statePtr: Pointer; seed: UInt64): XXH_errorcode; cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH64_reset'{$IFEND};
 
-function XXH32_intermediateDigest( AState: Pointer): Cardinal; cdecl; external name '_XXH32_intermediateDigest';
-///*
+function {$IFNDEF UNDERSCORE}XXH64_update{$ELSE}_XXH64_update{$ENDIF}(statePtr: Pointer; const input: Pointer; length: NativeUInt): XXH_errorcode; cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH64_update'{$IFEND};
 
-//*/
-//
-//
-//
-////****************************
-//// Deprecated function names
-////****************************
-//// The following translations are provided to ease code transition
-//// You are encouraged to no longer this function names
-//#define XXH32_feed   XXH32_update
-//#define XXH32_result XXH32_digest
-//#define XXH32_getIntermediateResult XXH32_intermediateDigest
+function {$IFNDEF UNDERSCORE}XXH64_digest{$ELSE}_XXH64_digest{$ENDIF}(const statePtr: Pointer): UInt64; cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH64_digest'{$IFEND};
+
+procedure {$IFNDEF UNDERSCORE}XXH64_canonicalFromHash{$ELSE}_XXH64_canonicalFromHash{$ENDIF}(dst: PUInt64; hash: UInt64); cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH64_canonicalFromHash'{$IFEND};
+
+function {$IFNDEF UNDERSCORE}XXH64_hashFromCanonical{$ELSE}_XXH64_hashFromCanonical{$ENDIF}(const src: PUInt64): UInt64; cdecl; external {$IF CompilerVersion > 22}name _PU + 'XXH64_hashFromCanonical'{$IFEND};
 
 implementation
+
+{$IFDEF Win64}
+  {$L Win64\xxhash.o}
+{$ELSE}
+  {$L Win32\xxhash.o}
+{$ENDIF}
 
 end.
