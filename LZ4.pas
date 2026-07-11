@@ -658,7 +658,9 @@ end;
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-initialization
+{$IFDEF TESTCASE}
+initialization // MS
   TestLZ4( ParamStr( 0 ) + '_', 2, True, True );
+{$ENDIF TESTCASE}
 
 end.
