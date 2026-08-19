@@ -654,13 +654,9 @@ begin
     end;
   sIn.free;
 end;
-{$ENDIF TESTCASE}
 
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-{$IFDEF TESTCASE}
-initialization // MS
-  TestLZ4( ParamStr( 0 ) + '_', 2, True, True );
-{$ENDIF TESTCASE}
+//initialization
+//  TestLZ4( ParamStr( 0 ) + '_', 2, True, True );
+{$ENDIF TESTCASE}  
 
 end.

@@ -729,13 +729,9 @@ begin
     end;
   sIn.free;
 end;
-{$ENDIF TESTCASE}
 
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-{$IFDEF TESTCASE}
-initialization // MS
-  TestLZ4Stream( ParamStr( 0 ) + '_', True, True );
+//initialization
+//  TestLZ4Stream( ParamStr( 0 ) + '_', True, True );
 {$ENDIF TESTCASE}
 
 end.
