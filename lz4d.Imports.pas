@@ -36,6 +36,13 @@ procedure {$IFNDEF UNDERSCORE}memmove{$ELSE}_memmove{$ENDIF}; external 'msvcrt.d
 
 {$IFDEF Win64}
 procedure __chkstk;
+
+var
+  // LZ4 1.10 sync (COFF/MSVC): vcruntime CPU dispatch variable, read by the
+  // memcpy intrinsics in lz4.obj. 0 = baseline (SSE2 path) - safe on every
+  // x64 CPU; must be interface-visible because lz4.obj is linked in a
+  // different unit.
+  __isa_available: Integer = 0;
 {$ELSE}
 procedure __chkstk_noalloc;
 //procedure __chkstk_ms;
